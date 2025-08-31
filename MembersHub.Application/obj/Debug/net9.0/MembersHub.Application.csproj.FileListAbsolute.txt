@@ -1,0 +1,15 @@
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/bin/Debug/net9.0/MembersHub.Application.deps.json
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/bin/Debug/net9.0/MembersHub.Application.dll
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/bin/Debug/net9.0/MembersHub.Application.pdb
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/bin/Debug/net9.0/MembersHub.Core.dll
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/bin/Debug/net9.0/MembersHub.Core.pdb
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.csproj.AssemblyReference.cache
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.GeneratedMSBuildEditorConfig.editorconfig
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.AssemblyInfoInputs.cache
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.AssemblyInfo.cs
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.csproj.CoreCompileInputs.cache
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersH.3DB4D641.Up2Date
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.dll
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/refint/MembersHub.Application.dll
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.pdb
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/ref/MembersHub.Application.dll

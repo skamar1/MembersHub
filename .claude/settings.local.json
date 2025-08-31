@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet workload install:*)",
+      "Bash(sudo dotnet workload install:*)",
+      "Bash(dotnet:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

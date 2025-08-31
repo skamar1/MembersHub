@@ -1,0 +1,12 @@
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/bin/Debug/net9.0/MembersHub.Core.deps.json
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/bin/Debug/net9.0/MembersHub.Core.dll
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/bin/Debug/net9.0/MembersHub.Core.pdb
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.csproj.AssemblyReference.cache
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.GeneratedMSBuildEditorConfig.editorconfig
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.AssemblyInfoInputs.cache
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.AssemblyInfo.cs
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.csproj.CoreCompileInputs.cache
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.dll
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/refint/MembersHub.Core.dll
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.pdb
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/ref/MembersHub.Core.dll

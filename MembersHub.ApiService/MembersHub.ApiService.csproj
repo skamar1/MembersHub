@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.4.1" />
+    <PackageReference Include="Aspire.StackExchange.Redis" Version="9.4.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.8" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MembersHub.Core\MembersHub.Core.csproj" />
+    <ProjectReference Include="..\MembersHub.Application\MembersHub.Application.csproj" />
+    <ProjectReference Include="..\MembersHub.Infrastructure\MembersHub.Infrastructure.csproj" />
+    <ProjectReference Include="..\MembersHub.Shared\MembersHub.Shared.csproj" />
+    <ProjectReference Include="..\MembersHub.ServiceDefaults\MembersHub.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>
