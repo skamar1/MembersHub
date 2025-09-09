@@ -1,0 +1,54 @@
+@page "/testmud"
+@using MudBlazor
+
+<PageTitle>Test MudBlazor</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h3" Color="Color.Primary">🎉 MudBlazor Test Page</MudText>
+    
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <MudText Typo="Typo.h5">Components Test:</MudText>
+        
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   StartIcon="Icons.Material.Filled.Add"
+                   Class="mt-2"
+                   OnClick="OnButtonClick">
+            @buttonText
+        </MudButton>
+        
+        <MudTextField @bind-Value="testText" 
+                      Label="Test Input" 
+                      Class="mt-4"
+                      Variant="Variant.Outlined" />
+        
+        <MudAlert Severity="Severity.Success" Class="mt-4">
+            ✅ Αν βλέπεις αυτά τα components με Material Design styling, το MudBlazor δουλεύει!
+        </MudAlert>
+        
+        <MudCard Class="mt-4">
+            <MudCardContent>
+                <MudText>Αυτό είναι ένα MudCard component</MudText>
+                <MudText Typo="Typo.body2">Αν το styling φαίνεται όμορφο, το MudBlazor είναι ενεργό!</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Size="Size.Small" Color="Color.Primary">Action</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private string testText = "Hello MudBlazor!";
+    private string buttonText = "Click Me! 🚀";
+    private int clickCount = 0;
+
+    private void OnButtonClick()
+    {
+        clickCount++;
+        buttonText = $"Clicked {clickCount} times! 🎉";
+        
+        // Bonus: Update the text field too
+        testText = $"Button clicked {clickCount} times - MudBlazor is working! 🎯";
+    }
+}

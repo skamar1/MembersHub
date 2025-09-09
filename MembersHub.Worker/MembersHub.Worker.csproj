@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-MembersHub.Worker-ea5b78bb-2dcc-436e-8f32-058882828fcc</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.4.1" />
+    <PackageReference Include="Aspire.StackExchange.Redis" Version="9.4.1" />
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.21" />
+    <PackageReference Include="Hangfire.Core" Version="1.8.21" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.20.12" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MembersHub.Core\MembersHub.Core.csproj" />
+    <ProjectReference Include="..\MembersHub.Application\MembersHub.Application.csproj" />
+    <ProjectReference Include="..\MembersHub.Infrastructure\MembersHub.Infrastructure.csproj" />
+    <ProjectReference Include="..\MembersHub.Shared\MembersHub.Shared.csproj" />
+    <ProjectReference Include="..\MembersHub.ServiceDefaults\MembersHub.ServiceDefaults.csproj" />
+  </ItemGroup>
+</Project>
