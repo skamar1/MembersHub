@@ -18,7 +18,8 @@
       "Bash(dotnet clean:*)",
       "Bash(find:*)",
       "Bash(/bashes)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
