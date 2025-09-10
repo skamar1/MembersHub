@@ -59,11 +59,11 @@
               "version": "[9.3.0, )",
               "autoReferenced": true
             },
-            "Aspire.Hosting.PostgreSQL": {
+            "Aspire.Hosting.Redis": {
               "target": "Package",
               "version": "[9.4.1, )"
             },
-            "Aspire.Hosting.Redis": {
+            "Aspire.Hosting.SqlServer": {
               "target": "Package",
               "version": "[9.4.1, )"
             }

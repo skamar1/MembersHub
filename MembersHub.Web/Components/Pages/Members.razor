@@ -1,0 +1,372 @@
+@page "/members"
+@using Microsoft.AspNetCore.Authorization
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
+@using MembersHub.Web.Components.Dialogs
+@attribute [Authorize]
+@using MudBlazor
+@using Microsoft.EntityFrameworkCore
+@inject IServiceScopeFactory ScopeFactory
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IAuditService AuditService
+@inject ISessionService SessionService
+@inject IHttpContextInfoService HttpContextInfo
+@attribute [Authorize]
+
+<PageTitle>Διαχείριση Μελών - MembersHub</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Color="Color.Primary">
+        👥 Διαχείριση Μελών
+    </MudText>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <!-- Header με στατιστικά και κουμπί προσθήκης -->
+        <div class="d-flex flex-column flex-sm-row justify-space-between align-center mb-4 gap-3">
+            <div class="d-flex flex-wrap gap-2 justify-center">
+                <MudBadge Content="@totalMembers" Color="Color.Primary" Overlap="true">
+                    <MudButton Variant="Variant.Outlined" StartIcon="Icons.Material.Filled.Group">
+                        Σύνολο Μελών
+                    </MudButton>
+                </MudBadge>
+                <MudBadge Content="@activeMembers" Color="Color.Success" Overlap="true">
+                    <MudButton Variant="Variant.Outlined" StartIcon="Icons.Material.Filled.CheckCircle">
+                        Ενεργά
+                    </MudButton>
+                </MudBadge>
+                <MudBadge Content="@(totalMembers - activeMembers)" Color="Color.Warning" Overlap="true">
+                    <MudButton Variant="Variant.Outlined" StartIcon="Icons.Material.Filled.Pause">
+                        Ανενεργά
+                    </MudButton>
+                </MudBadge>
+            </div>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       StartIcon="Icons.Material.Filled.Add"
+                       OnClick="@OpenCreateDialog">
+                Νέο Μέλος
+            </MudButton>
+        </div>
+
+        <!-- Search και Filters -->
+        <div class="d-flex flex-column flex-md-row gap-3 mb-4">
+            <MudTextField @bind-Value="searchString" 
+                          Label="Αναζήτηση μελών..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="Icons.Material.Filled.Search"
+                          Class="flex-grow-1" />
+            
+            <MudSelect @bind-Value="selectedMembershipType" 
+                       Label="Τύπος Συνδρομής"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem Value="0">Όλοι</MudSelectItem>
+                @foreach (var type in membershipTypes)
+                {
+                    <MudSelectItem Value="type.Id">@type.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect @bind-Value="selectedStatus" 
+                       Label="Κατάσταση"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem Value="@((string?)null)">Όλες</MudSelectItem>
+                <MudSelectItem Value="@("Active")">Ενεργά</MudSelectItem>
+                <MudSelectItem Value="@("Inactive")">Ανενεργά</MudSelectItem>
+                <MudSelectItem Value="@("Suspended")">Αναστολή</MudSelectItem>
+            </MudSelect>
+        </div>
+
+        <!-- Desktop Data Table -->
+        <MudHidden Breakpoint="Breakpoint.SmAndDown">
+            <MudDataGrid Items="@filteredMembers" 
+                     Dense="true" 
+                     Hover="true" 
+                     Bordered="true" 
+                     Striped="true"
+                     Loading="@loading"
+                     LoadingProgressColor="Color.Primary"
+                     Class="thick-borders">
+            <Columns>
+                <PropertyColumn Property="x => x.MemberNumber" Title="Αριθμός" />
+                <PropertyColumn Property="x => x.FullName" Title="Ονοματεπώνυμο" />
+                <PropertyColumn Property="x => x.Phone" Title="Τηλέφωνο" />
+                <PropertyColumn Property="x => x.Email" Title="Email" />
+                <PropertyColumn Property="x => x.MembershipType.Name" Title="Τύπος Συνδρομής" />
+                <PropertyColumn Property="x => x.MembershipType.MonthlyFee" Title="Μηνιαία Συνδρομή" Format="C2" />
+                <TemplateColumn Title="Κατάσταση">
+                    <CellTemplate>
+                        <MudChip T="string" Size="Size.Small" 
+                                 Color="@GetStatusColor(context.Item.Status)">
+                            @GetStatusText(context.Item.Status)
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Ημ. Εγγραφής">
+                    <CellTemplate>
+                        @context.Item.CreatedAt.ToString("dd/MM/yyyy")
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Ενέργειες" Sortable="false">
+                    <CellTemplate>
+                        <div class="d-flex gap-2">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                           Size="Size.Small" 
+                                           Color="Color.Primary"
+                                           Variant="Variant.Filled"
+                                           OnClick="() => EditMember(context.Item)" 
+                                           title="Επεξεργασία" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Payment" 
+                                           Size="Size.Small" 
+                                           Color="Color.Success"
+                                           Variant="Variant.Filled"
+                                           OnClick="() => ViewPayments(context.Item)"
+                                           title="Πληρωμές" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                           Size="Size.Small" 
+                                           Color="Color.Error"
+                                           Variant="Variant.Filled"
+                                           OnClick="() => DeleteMember(context.Item)"
+                                           title="Διαγραφή" />
+                        </div>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            </MudDataGrid>
+        </MudHidden>
+
+        <!-- Mobile Cards -->
+        <MudHidden Breakpoint="Breakpoint.MdAndUp">
+            <MudGrid>
+                @foreach (var member in filteredMembers)
+                {
+                    <MudItem xs="12">
+                        <MudCard Class="mb-3">
+                            <MudCardContent>
+                                <div class="d-flex justify-space-between align-center mb-2">
+                                    <MudText Typo="Typo.h6">@member.FullName</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(member.Status)">
+                                        @GetStatusText(member.Status)
+                                    </MudChip>
+                                </div>
+                                <MudText Typo="Typo.body2" Class="mb-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Small" /> @member.MemberNumber
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mb-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" /> @member.Phone
+                                </MudText>
+                                @if (!string.IsNullOrEmpty(member.Email))
+                                {
+                                    <MudText Typo="Typo.body2" Class="mb-1">
+                                        <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" /> @member.Email
+                                    </MudText>
+                                }
+                                <MudText Typo="Typo.body2" Class="mb-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Small" /> @member.MembershipType.Name - €@member.MembershipType.MonthlyFee/μήνα
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Default">
+                                    Εγγραφή: @member.CreatedAt.ToString("dd/MM/yyyy")
+                                </MudText>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                               Size="Size.Small" 
+                                               Color="Color.Primary"
+                                               OnClick="() => EditMember(member)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Payment" 
+                                               Size="Size.Small" 
+                                               Color="Color.Success"
+                                               OnClick="() => ViewPayments(member)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                               Size="Size.Small" 
+                                               Color="Color.Error"
+                                               OnClick="() => DeleteMember(member)" />
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudHidden>
+
+        @if (!filteredMembers.Any() && !loading)
+        {
+            <div class="text-center pa-8">
+                <MudIcon Icon="Icons.Material.Filled.PersonOff" Size="Size.Large" Color="Color.Default" />
+                <MudText Typo="Typo.h6" Color="Color.Default" Class="mt-2">
+                    Δεν βρέθηκαν μέλη με αυτά τα κριτήρια
+                </MudText>
+            </div>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<Member> members = new();
+    private List<MembershipType> membershipTypes = new();
+    private bool loading = true;
+    
+    private string searchString = "";
+    private int selectedMembershipType = 0;
+    private string? selectedStatus = null;
+    
+    private int totalMembers => members.Count;
+    private int activeMembers => members.Count(m => m.Status == MemberStatus.Active);
+    
+    private IEnumerable<Member> filteredMembers => members.Where(m =>
+        (string.IsNullOrWhiteSpace(searchString) ||
+         m.FullName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+         m.Phone.Contains(searchString) ||
+         (m.Email?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+         m.MemberNumber.Contains(searchString, StringComparison.OrdinalIgnoreCase)) &&
+        (selectedMembershipType == 0 || m.MembershipTypeId == selectedMembershipType) &&
+        (selectedStatus == null || m.Status.ToString() == selectedStatus)
+    );
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+    
+    private async Task LoadData()
+    {
+        loading = true;
+        
+        try
+        {
+            using var scope = ScopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<MembersHubContext>();
+            
+            members = await dbContext.Members
+                .Include(m => m.MembershipType)
+                .OrderBy(m => m.MemberNumber)
+                .ToListAsync();
+                
+            membershipTypes = await dbContext.MembershipTypes
+                .Where(mt => mt.IsActive)
+                .OrderBy(mt => mt.Name)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης δεδομένων: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+    
+    private Color GetStatusColor(MemberStatus status) => status switch
+    {
+        MemberStatus.Active => Color.Success,
+        MemberStatus.Inactive => Color.Default,
+        MemberStatus.Suspended => Color.Warning,
+        _ => Color.Default
+    };
+    
+    private string GetStatusText(MemberStatus status) => status switch
+    {
+        MemberStatus.Active => "Ενεργό",
+        MemberStatus.Inactive => "Ανενεργό",
+        MemberStatus.Suspended => "Αναστολή",
+        _ => "Άγνωστο"
+    };
+    
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions 
+        { 
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+        
+        var dialog = await DialogService.ShowAsync<MemberDialog>(
+            "Νέο Μέλος", 
+            options);
+            
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+    
+    private async Task EditMember(Member member)
+    {
+        var parameters = new DialogParameters<MemberDialog>
+        {
+            { x => x.ExistingMember, member }
+        };
+        
+        var options = new DialogOptions 
+        { 
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+        
+        var dialog = await DialogService.ShowAsync<MemberDialog>(
+            $"Επεξεργασία Μέλους - {member.FullName}", 
+            parameters,
+            options);
+            
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+    
+    private void ViewPayments(Member member)
+    {
+        // TODO: Navigate to payments view
+        Snackbar.Add($"Προβολή πληρωμών για: {member.FullName}", Severity.Info);
+    }
+    
+    private async Task DeleteMember(Member member)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Διαγραφή Μέλους",
+            $"Είστε σίγουροι ότι θέλετε να διαγράψετε το μέλος '{member.FullName}'?",
+            yesText: "Διαγραφή",
+            cancelText: "Άκυρο");
+            
+        if (result == true)
+        {
+            try
+            {
+                using var scope = ScopeFactory.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<MembersHubContext>();
+                
+                var memberToDelete = await dbContext.Members.FindAsync(member.Id);
+                if (memberToDelete != null)
+                {
+                    // Audit logging για member deletion (πριν τη διαγραφή)
+                    var currentUser = await SessionService.GetCurrentUserAsync();
+                    if (currentUser != null)
+                    {
+                        await AuditService.LogDeleteAsync(memberToDelete, 
+                            currentUser.Id, currentUser.Username, currentUser.FullName, 
+                            HttpContextInfo.GetIpAddress());
+                    }
+                    
+                    dbContext.Members.Remove(memberToDelete);
+                    await dbContext.SaveChangesAsync();
+                }
+                
+                await LoadData();
+                Snackbar.Add($"Το μέλος '{member.FullName}' διαγράφηκε επιτυχώς", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Σφάλμα διαγραφής: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

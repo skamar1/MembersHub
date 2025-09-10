@@ -1,0 +1,258 @@
+@using MembersHub.Core.Entities
+@using MembersHub.Application.DTOs
+@using MembersHub.Application.Services
+@using MembersHub.Core.Interfaces
+@using Microsoft.EntityFrameworkCore
+@using MembersHub.Infrastructure.Data
+@using System.ComponentModel.DataAnnotations
+@using MudBlazor
+@inject IMemberService MemberService
+@inject MembersHubContext DbContext
+@inject ISnackbar Snackbar
+@inject IAuditService AuditService
+@inject ISessionService SessionService
+@inject IHttpContextInfoService HttpContextInfo
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="model.FirstName" 
+                                  Label="Όνομα" 
+                                  Required="true" 
+                                  RequiredError="Το όνομα είναι υποχρεωτικό"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="model.LastName" 
+                                  Label="Επώνυμο" 
+                                  Required="true" 
+                                  RequiredError="Το επώνυμο είναι υποχρεωτικό"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="model.Phone" 
+                                  Label="Τηλέφωνο" 
+                                  Required="true" 
+                                  RequiredError="Το τηλέφωνο είναι υποχρεωτικό"
+                                  Mask="@(new PatternMask("0000000000"))"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="model.Email" 
+                                  Label="Email" 
+                                  InputType="InputType.Email"
+                                  Validation="@(new EmailAddressAttribute() { ErrorMessage = "Μη έγκυρο email" })"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="dateOfBirth" 
+                                   Label="Ημερομηνία Γέννησης"
+                                   Editable="true"
+                                   DateFormat="dd/MM/yyyy"
+                                   Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect @bind-Value="model.MembershipTypeId" 
+                               Label="Τύπος Συνδρομής" 
+                               Required="true"
+                               RequiredError="Επιλέξτε τύπο συνδρομής"
+                               Variant="Variant.Outlined">
+                        @foreach (var type in membershipTypes)
+                        {
+                            <MudSelectItem Value="@type.Id">
+                                @type.Name - €@type.MonthlyFee/μήνα
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                @if (IsEdit)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudSelect @bind-Value="updateModel.Status" 
+                                   Label="Κατάσταση"
+                                   Variant="Variant.Outlined">
+                            <MudSelectItem Value="MemberStatus.Active">Ενεργό</MudSelectItem>
+                            <MudSelectItem Value="MemberStatus.Inactive">Ανενεργό</MudSelectItem>
+                            <MudSelectItem Value="MemberStatus.Suspended">Αναστολή</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField Value="@existingMember?.MemberNumber" 
+                                      Label="Αριθμός Μέλους" 
+                                      ReadOnly="true"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Άκυρο</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit"
+                   Disabled="@processing">
+            @if (processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Αποθήκευση...</MudText>
+            }
+            else
+            {
+                <MudText>@(IsEdit ? "Ενημέρωση" : "Δημιουργία")</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    public IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    [Parameter] 
+    public Member? ExistingMember { get; set; }
+
+    private bool IsEdit => ExistingMember != null;
+    private MudForm form = null!;
+    private bool success;
+    private string[] errors = { };
+    private bool processing = false;
+    
+    private CreateMemberDto model = new();
+    private UpdateMemberDto updateModel = new();
+    private Member? existingMember;
+    private DateTime? dateOfBirth;
+    private List<MembershipType> membershipTypes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load membership types
+        membershipTypes = await DbContext.MembershipTypes
+            .Where(mt => mt.IsActive)
+            .OrderBy(mt => mt.Name)
+            .ToListAsync();
+
+        if (IsEdit && ExistingMember != null)
+        {
+            existingMember = ExistingMember;
+            // Populate update model
+            updateModel = new UpdateMemberDto
+            {
+                Id = existingMember.Id,
+                FirstName = existingMember.FirstName,
+                LastName = existingMember.LastName,
+                Email = existingMember.Email,
+                Phone = existingMember.Phone,
+                DateOfBirth = existingMember.DateOfBirth,
+                MembershipTypeId = existingMember.MembershipTypeId,
+                Status = existingMember.Status
+            };
+            model = new CreateMemberDto
+            {
+                FirstName = existingMember.FirstName,
+                LastName = existingMember.LastName,
+                Email = existingMember.Email,
+                Phone = existingMember.Phone,
+                DateOfBirth = existingMember.DateOfBirth,
+                MembershipTypeId = existingMember.MembershipTypeId
+            };
+            dateOfBirth = existingMember.DateOfBirth;
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        if (form != null)
+        {
+            await form.Validate();
+            
+            if (!success)
+            {
+                Snackbar.Add("Παρακαλώ διορθώστε τα σφάλματα στη φόρμα", Severity.Warning);
+                return;
+            }
+        }
+
+        processing = true;
+        StateHasChanged();
+
+        try
+        {
+            // Update date of birth from picker
+            if (dateOfBirth.HasValue)
+            {
+                model.DateOfBirth = dateOfBirth.Value;
+                if (IsEdit) updateModel.DateOfBirth = dateOfBirth.Value;
+            }
+
+            if (IsEdit)
+            {
+                // Update existing member
+                // Get old values for audit (AsNoTracking για accurate snapshot)
+                var oldMember = await DbContext.Members
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(m => m.Id == updateModel.Id);
+                
+                var member = await MemberService.GetByIdAsync(updateModel.Id);
+                if (member != null && oldMember != null)
+                {
+                    
+                    member.FirstName = model.FirstName;
+                    member.LastName = model.LastName;
+                    member.Email = model.Email;
+                    member.Phone = model.Phone;
+                    member.DateOfBirth = model.DateOfBirth;
+                    member.MembershipTypeId = model.MembershipTypeId;
+                    member.Status = updateModel.Status;
+                    
+                    await MemberService.UpdateAsync(member);
+                    
+                    // Audit logging για member update
+                    var currentUser = await SessionService.GetCurrentUserAsync();
+                    if (currentUser != null)
+                    {
+                        await AuditService.LogUpdateAsync(oldMember, member, 
+                            currentUser.Id, currentUser.Username, currentUser.FullName, 
+                            HttpContextInfo.GetIpAddress());
+                    }
+                    
+                    Snackbar.Add($"Το μέλος '{member.FullName}' ενημερώθηκε επιτυχώς", Severity.Success);
+                }
+            }
+            else
+            {
+                // Create new member
+                var newMember = model.ToEntity();
+                await MemberService.CreateAsync(newMember);
+                
+                // Audit logging για member creation
+                var currentUser = await SessionService.GetCurrentUserAsync();
+                if (currentUser != null)
+                {
+                    await AuditService.LogCreateAsync(newMember, 
+                        currentUser.Id, currentUser.Username, currentUser.FullName, 
+                        HttpContextInfo.GetIpAddress());
+                }
+                
+                Snackbar.Add($"Το μέλος '{newMember.FullName}' δημιουργήθηκε επιτυχώς με αριθμό {newMember.MemberNumber}", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            processing = false;
+            StateHasChanged();
+        }
+    }
+}

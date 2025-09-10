@@ -1,0 +1,146 @@
+@page "/testdata"
+@using MembersHub.Core.Entities
+@using MembersHub.Infrastructure.Data
+@using MudBlazor
+@inject IServiceScopeFactory ScopeFactory
+@inject ISnackbar Snackbar
+@rendermode InteractiveServer
+
+<PageTitle>Test Data - MembersHub</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <MudText Typo="Typo.h4" Color="Color.Primary" Class="mb-4">
+        🧪 Test Data Generator
+    </MudText>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   OnClick="CreateTestData"
+                   Disabled="@loading">
+            @if (loading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                <span class="ml-2">Δημιουργία...</span>
+            }
+            else
+            {
+                <span>Δημιουργία Test Members</span>
+            }
+        </MudButton>
+
+        <MudText Class="mt-4" Typo="Typo.body2">
+            Αυτό θα δημιουργήσει 5 test members στη βάση δεδομένων.
+        </MudText>
+
+        @if (!string.IsNullOrEmpty(result))
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-4">
+                @result
+            </MudAlert>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private bool loading = false;
+    private string result = "";
+    
+    private async Task CreateTestData()
+    {
+        loading = true;
+        result = "";
+        
+        try
+        {
+            using var scope = ScopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<MembersHubContext>();
+            
+            // Clear existing members
+            var existingMembers = dbContext.Members.ToList();
+            dbContext.Members.RemoveRange(existingMembers);
+            
+            // Get membership types
+            var adultType = dbContext.MembershipTypes.First(mt => mt.Name == "Ενήλικες");
+            var childType = dbContext.MembershipTypes.First(mt => mt.Name == "Παιδιά");
+            
+            // Create test members
+            var members = new List<Member>
+            {
+                new Member
+                {
+                    FirstName = "Γιάννης",
+                    LastName = "Παπαδόπουλος", 
+                    Phone = "6971234567",
+                    Email = "giannis@example.com",
+                    MembershipTypeId = adultType.Id,
+                    MemberNumber = "M001",
+                    Status = MemberStatus.Active,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                },
+                new Member
+                {
+                    FirstName = "Μαρία",
+                    LastName = "Γεωργίου",
+                    Phone = "6972345678", 
+                    Email = "maria@example.com",
+                    MembershipTypeId = adultType.Id,
+                    MemberNumber = "M002",
+                    Status = MemberStatus.Active,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                },
+                new Member
+                {
+                    FirstName = "Πέτρος",
+                    LastName = "Δημητρίου",
+                    Phone = "6973456789",
+                    MembershipTypeId = childType.Id,
+                    MemberNumber = "M003", 
+                    Status = MemberStatus.Active,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                },
+                new Member
+                {
+                    FirstName = "Ελένη",
+                    LastName = "Κωνσταντίνου",
+                    Phone = "6974567890",
+                    Email = "eleni@example.com", 
+                    MembershipTypeId = adultType.Id,
+                    MemberNumber = "M004",
+                    Status = MemberStatus.Inactive,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                },
+                new Member
+                {
+                    FirstName = "Νίκος",
+                    LastName = "Αντωνίου",
+                    Phone = "6975678901",
+                    MembershipTypeId = childType.Id,
+                    MemberNumber = "M005",
+                    Status = MemberStatus.Suspended,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                }
+            };
+            
+            await dbContext.Members.AddRangeAsync(members);
+            await dbContext.SaveChangesAsync();
+            
+            result = $"✅ Δημιουργήθηκαν {members.Count} test members επιτυχώς!";
+            Snackbar.Add("Test data δημιουργήθηκαν!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            result = $"❌ Σφάλμα: {ex.Message}";
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+}

@@ -11,16 +11,16 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // Add DbContext with PostgreSQL
+        // Add DbContext with SQL Server
         services.AddDbContext<MembersHubContext>(options =>
         {
             var connectionString = configuration.GetConnectionString("membershubdb") 
                 ?? configuration.GetConnectionString("DefaultConnection")
-                ?? "Host=localhost;Database=membershubdb;Username=postgres;Password=postgres";
+                ?? "Server=100.113.99.32,1433;Database=membershubdb;User Id=sa;Password=admin8*;TrustServerCertificate=true;Encrypt=false;";
             
-            options.UseNpgsql(connectionString, npgsqlOptions =>
+            options.UseSqlServer(connectionString, sqlServerOptions =>
             {
-                npgsqlOptions.MigrationsAssembly(typeof(MembersHubContext).Assembly.FullName);
+                sqlServerOptions.MigrationsAssembly(typeof(MembersHubContext).Assembly.FullName);
             });
         });
 

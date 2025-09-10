@@ -130,6 +130,9 @@
             "projectReferences": {
               "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/MembersHub.Core.csproj": {
                 "projectPath": "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/MembersHub.Core.csproj"
+              },
+              "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Infrastructure/MembersHub.Infrastructure.csproj": {
+                "projectPath": "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Infrastructure/MembersHub.Infrastructure.csproj"
               }
             }
           }
@@ -150,6 +153,10 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "dependencies": {
+            "BCrypt.Net-Next": {
+              "target": "Package",
+              "version": "[4.0.3, )"
+            },
             "FluentValidation": {
               "target": "Package",
               "version": "[12.0.0, )"
@@ -157,6 +164,18 @@
             "FluentValidation.DependencyInjectionExtensions": {
               "target": "Package",
               "version": "[12.0.0, )"
+            },
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[9.0.0, )"
+            },
+            "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[9.0.8, )"
+            },
+            "Microsoft.Extensions.DependencyInjection.Abstractions": {
+              "target": "Package",
+              "version": "[9.0.8, )"
             },
             "Microsoft.Extensions.Logging.Abstractions": {
               "target": "Package",
@@ -272,9 +291,6 @@
           "net9.0": {
             "targetAlias": "net9.0",
             "projectReferences": {
-              "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/MembersHub.Application.csproj": {
-                "projectPath": "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/MembersHub.Application.csproj"
-              },
               "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/MembersHub.Core.csproj": {
                 "projectPath": "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/MembersHub.Core.csproj"
               }
@@ -297,7 +313,7 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "dependencies": {
-            "Aspire.Npgsql.EntityFrameworkCore.PostgreSQL": {
+            "Aspire.Microsoft.EntityFrameworkCore.SqlServer": {
               "target": "Package",
               "version": "[9.4.1, )"
             },
@@ -308,6 +324,10 @@
             "Microsoft.EntityFrameworkCore.Design": {
               "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
               "suppressParent": "All",
+              "target": "Package",
+              "version": "[9.0.8, )"
+            },
+            "Microsoft.EntityFrameworkCore.SqlServer": {
               "target": "Package",
               "version": "[9.0.8, )"
             },
@@ -328,10 +348,6 @@
             "Microsoft.Extensions.Configuration.Json": {
               "target": "Package",
               "version": "[9.0.8, )"
-            },
-            "Npgsql.EntityFrameworkCore.PostgreSQL": {
-              "target": "Package",
-              "version": "[9.0.4, )"
             },
             "System.IdentityModel.Tokens.Jwt": {
               "target": "Package",

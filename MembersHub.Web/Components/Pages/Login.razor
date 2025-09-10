@@ -1,0 +1,220 @@
+@page "/login"
+@layout Layout.LoginLayout
+@using MudBlazor
+@using MembersHub.Core.Interfaces
+@using MembersHub.Web.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IAuthenticationService AuthService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject ISessionService SessionService
+@inject IAuditService AuditService
+@inject IHttpContextInfoService HttpContextInfo
+
+<PageTitle>Είσοδος - MembersHub</PageTitle>
+
+<MudCard Elevation="3" Class="login-card">
+    <MudCardContent Class="pa-6">
+        <div class="text-center mb-6">
+            <MudAvatar Size="Size.Large" Class="mx-auto mb-4" Style="width: 80px; height: 80px; background-color: #7C6FD8;">
+                <MudText Typo="Typo.h4" Style="color: white; font-weight: bold;">MH</MudText>
+            </MudAvatar>
+            <MudText Typo="Typo.h5" Style="color: #7C6FD8; font-weight: 600; letter-spacing: 2px;">
+                MEMBERS HUB
+            </MudText>
+            <MudText Typo="Typo.caption" Style="color: #999; letter-spacing: 1px;">
+                ΣΎΣΤΗΜΑ ΔΙΑΧΕΊΡΙΣΗΣ ΜΕΛΏΝ
+            </MudText>
+        </div>
+
+        <MudForm @ref="form" @bind-IsValid="@isValid">
+            <MudTextField T="string"
+                         @bind-Value="loginModel.Username"
+                         Label="Username"
+                         Variant="Variant.Outlined"
+                         Required="true"
+                         RequiredError="Το όνομα χρήστη είναι υποχρεωτικό"
+                         Class="mb-4"
+                         Style="background: white;" />
+
+            <MudTextField T="string"
+                         @bind-Value="loginModel.Password"
+                         Label="Password"
+                         Variant="Variant.Outlined"
+                         InputType="@passwordInput"
+                         Required="true"
+                         RequiredError="Ο κωδικός είναι υποχρεωτικός"
+                         Adornment="Adornment.End"
+                         AdornmentIcon="@passwordInputIcon"
+                         OnAdornmentClick="TogglePasswordVisibility"
+                         AdornmentAriaLabel="Show Password"
+                         Class="mb-4"
+                         Style="background: white;" />
+
+            @* <MudCheckBox @bind-Checked="loginModel.RememberMe"
+                        Color="Color.Primary"
+                        Label="Θυμήσου με"
+                        Class="mb-4"
+                        Style="color: #666;" /> *@
+
+            <MudButton Variant="Variant.Filled"
+                      Color="Color.Primary"
+                      Size="Size.Large"
+                      FullWidth="true"
+                      OnClick="HandleLogin"
+                      Disabled="@(!isValid || isLoading)"
+                      Class="signin-button">
+                @if (isLoading)
+                {
+                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" Color="Color.Inherit" />
+                    <MudText Class="ms-2">Σύνδεση...</MudText>
+                }
+                else
+                {
+                    <MudText>Sign In</MudText>
+                }
+            </MudButton>
+        </MudForm>
+
+        <div class="text-center mt-4">
+            <MudLink Href="/forgot-password" Style="color: #7C6FD8; font-size: 14px;">
+                Ξεχάσατε τον κωδικό;
+            </MudLink>
+        </div>
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .login-card {
+        background: white !important;
+        border-radius: 20px !important;
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    .signin-button {
+        background-color: #7C6FD8 !important;
+        text-transform: none !important;
+        font-weight: 600 !important;
+        padding: 12px !important;
+        border-radius: 8px !important;
+    }
+
+    .signin-button:hover {
+        background-color: #6B5EC5 !important;
+        box-shadow: 0 5px 15px rgba(124, 111, 216, 0.3) !important;
+    }
+
+    ::deep .mud-input-outlined:not(.mud-disabled) .mud-input-outlined-border {
+        border-color: #ddd !important;
+        border-radius: 8px !important;
+    }
+
+    ::deep .mud-input-outlined.mud-focused .mud-input-outlined-border {
+        border-color: #7C6FD8 !important;
+        border-width: 2px !important;
+    }
+
+    ::deep .mud-checkbox-primary.mud-checked .mud-icon-button-label svg {
+        color: #7C6FD8 !important;
+    }
+
+    ::deep .mud-input-label {
+        color: #666 !important;
+    }
+
+    ::deep .mud-input-label-inputcontrol {
+        top: 16px !important;
+    }
+
+    ::deep .mud-input-outlined.mud-shrink .mud-input-label {
+        background-color: white !important;
+        padding: 0 4px !important;
+    }
+</style>
+
+@code {
+    private MudForm form = null!;
+    private bool isValid;
+    private bool isLoading;
+    private bool isPasswordVisible;
+    private InputType passwordInput = InputType.Password;
+    private string passwordInputIcon = Icons.Material.Filled.VisibilityOff;
+    private LoginModel loginModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (await SessionService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/", replace: true);
+        }
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        if (isPasswordVisible)
+        {
+            isPasswordVisible = false;
+            passwordInputIcon = Icons.Material.Filled.VisibilityOff;
+            passwordInput = InputType.Password;
+        }
+        else
+        {
+            isPasswordVisible = true;
+            passwordInputIcon = Icons.Material.Filled.Visibility;
+            passwordInput = InputType.Text;
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        await form.Validate();
+        if (!isValid) return;
+
+        isLoading = true;
+        StateHasChanged();
+
+        var ipAddress = HttpContextInfo.GetIpAddress();
+        var userAgent = HttpContextInfo.GetUserAgent();
+
+        try
+        {
+            var result = await AuthService.AuthenticateAsync(loginModel.Username, loginModel.Password);
+
+            if (result.IsSuccess && result.User != null)
+            {
+                await AuditService.LogLoginAsync(result.User.Id, result.User.Username, result.User.FullName, ipAddress, userAgent);
+                
+                var token = await AuthService.GenerateJwtTokenAsync(result.User);
+                await AuthStateProvider.MarkUserAsAuthenticated(result.User, token);
+                
+                Snackbar.Add($"Καλώς ήρθατε, {result.User.FullName}!", Severity.Success);
+                Navigation.NavigateTo("/", replace: true);
+            }
+            else
+            {
+                await AuditService.LogLoginFailedAsync(loginModel.Username, ipAddress, userAgent, result.ErrorMessage);
+                Snackbar.Add(result.ErrorMessage ?? "Λάθος όνομα χρήστη ή κωδικός", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            await AuditService.LogLoginFailedAsync(loginModel.Username, ipAddress, userAgent, ex.Message);
+            Snackbar.Add($"Σφάλμα σύνδεσης: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public class LoginModel
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public bool RememberMe { get; set; }
+    }
+}

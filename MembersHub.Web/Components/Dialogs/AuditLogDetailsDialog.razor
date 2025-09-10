@@ -1,0 +1,152 @@
+@using MembersHub.Core.Entities
+@using MudBlazor
+@using System.Text.Json
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6">
+                <MudTextField Label="Ημερομηνία & Ώρα" 
+                              Value="@AuditLog.Timestamp.ToString("dd/MM/yyyy HH:mm:ss")" 
+                              ReadOnly="true" 
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField Label="Χρήστης" 
+                              Value="@($"{AuditLog.FullName} ({AuditLog.Username})")" 
+                              ReadOnly="true" 
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField Label="Ενέργεια" 
+                              Value="@GetActionDisplayName(AuditLog.Action)" 
+                              ReadOnly="true" 
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField Label="Τύπος Οντότητας" 
+                              Value="@AuditLog.EntityType" 
+                              ReadOnly="true" 
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            @if (!string.IsNullOrEmpty(AuditLog.EntityId))
+            {
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="ID Οντότητας" 
+                                  Value="@AuditLog.EntityId" 
+                                  ReadOnly="true" 
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+            }
+            @if (!string.IsNullOrEmpty(AuditLog.EntityName))
+            {
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="Όνομα Οντότητας" 
+                                  Value="@AuditLog.EntityName" 
+                                  ReadOnly="true" 
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+            }
+            <MudItem xs="12">
+                <MudTextField Label="Περιγραφή" 
+                              Value="@AuditLog.Description" 
+                              ReadOnly="true" 
+                              Variant="Variant.Outlined"
+                              Lines="3" />
+            </MudItem>
+            @if (!string.IsNullOrEmpty(AuditLog.OldValues))
+            {
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="Προηγούμενες Τιμές (JSON)" 
+                                  Value="@FormatJson(AuditLog.OldValues)" 
+                                  ReadOnly="true" 
+                                  Variant="Variant.Outlined"
+                                  Lines="8" />
+                </MudItem>
+            }
+            @if (!string.IsNullOrEmpty(AuditLog.NewValues))
+            {
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="Νέες Τιμές (JSON)" 
+                                  Value="@FormatJson(AuditLog.NewValues)" 
+                                  ReadOnly="true" 
+                                  Variant="Variant.Outlined"
+                                  Lines="8" />
+                </MudItem>
+            }
+            @if (!string.IsNullOrEmpty(AuditLog.IpAddress))
+            {
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="IP Address" 
+                                  Value="@AuditLog.IpAddress" 
+                                  ReadOnly="true" 
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+            }
+            @if (!string.IsNullOrEmpty(AuditLog.UserAgent))
+            {
+                <MudItem xs="12">
+                    <MudTextField Label="User Agent" 
+                                  Value="@AuditLog.UserAgent" 
+                                  ReadOnly="true" 
+                                  Variant="Variant.Outlined"
+                                  Lines="2" />
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Close">Κλείσιμο</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    public IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] 
+    public AuditLog AuditLog { get; set; } = null!;
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+
+    private string GetActionDisplayName(AuditAction action) => action switch
+    {
+        AuditAction.Login => "Σύνδεση",
+        AuditAction.Logout => "Αποσύνδεση",
+        AuditAction.LoginFailed => "Αποτυχημένη Σύνδεση",
+        AuditAction.MemberCreate => "Δημιουργία Μέλους",
+        AuditAction.MemberUpdate => "Ενημέρωση Μέλους",
+        AuditAction.MemberDelete => "Διαγραφή Μέλους",
+        AuditAction.UserCreate => "Δημιουργία Χρήστη",
+        AuditAction.UserUpdate => "Ενημέρωση Χρήστη",
+        AuditAction.UserDelete => "Διαγραφή Χρήστη",
+        AuditAction.PasswordReset => "Επαναφορά Κωδικού",
+        AuditAction.PaymentCreate => "Νέα Πληρωμή",
+        AuditAction.ExpenseCreate => "Νέο Έξοδο",
+        AuditAction.UnauthorizedAccess => "Μη Εξουσιοδοτημένη Πρόσβαση",
+        _ => action.ToString()
+    };
+    
+    private string FormatJson(string? json)
+    {
+        if (string.IsNullOrEmpty(json))
+            return "";
+            
+        try
+        {
+            var jsonDocument = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(jsonDocument, new JsonSerializerOptions 
+            { 
+                WriteIndented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            });
+        }
+        catch
+        {
+            return json;
+        }
+    }
+}

@@ -1,0 +1,511 @@
+@page "/users"
+@using Microsoft.AspNetCore.Authorization
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
+@using MudBlazor
+@attribute [Authorize(Roles = "Admin,Owner")]
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IServiceScopeFactory ScopeFactory
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IAuditService AuditService
+@inject ISessionService SessionService
+@inject IHttpContextInfoService HttpContextInfo
+@attribute [Authorize(Roles = "Admin,Owner")]
+
+<PageTitle>Διαχείριση Χρηστών - MembersHub</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Color="Color.Primary">
+        👥 Διαχείριση Χρηστών
+    </MudText>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <!-- Header με στατιστικά και κουμπί προσθήκης -->
+        <div class="d-flex flex-column flex-sm-row justify-space-between align-center mb-4 gap-3">
+            <div class="d-flex flex-wrap gap-2 justify-center">
+                <MudBadge Content="@totalUsers" Color="Color.Primary" Overlap="true">
+                    <MudButton Variant="Variant.Outlined" StartIcon="Icons.Material.Filled.Group">
+                        Σύνολο Χρηστών
+                    </MudButton>
+                </MudBadge>
+                <MudBadge Content="@activeUsers" Color="Color.Success" Overlap="true">
+                    <MudButton Variant="Variant.Outlined" StartIcon="Icons.Material.Filled.CheckCircle">
+                        Ενεργοί
+                    </MudButton>
+                </MudBadge>
+                <MudBadge Content="@adminUsers" Color="Color.Warning" Overlap="true">
+                    <MudButton Variant="Variant.Outlined" StartIcon="Icons.Material.Filled.AdminPanelSettings">
+                        Διαχειριστές
+                    </MudButton>
+                </MudBadge>
+            </div>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       StartIcon="Icons.Material.Filled.Add"
+                       OnClick="@OpenCreateDialog">
+                Νέος Χρήστης
+            </MudButton>
+        </div>
+
+        <!-- Search και Filters -->
+        <div class="d-flex flex-column flex-md-row gap-3 mb-4">
+            <MudTextField @bind-Value="searchString" 
+                          Label="Αναζήτηση χρηστών..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="Icons.Material.Filled.Search"
+                          Class="flex-grow-1" />
+            
+            <MudSelect T="string" @bind-Value="selectedRoleString" 
+                       Label="Ρόλος"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem T="string" Value="@((string)null!)">Όλοι</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Admin")">Διαχειριστής</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Owner")">Ιδιοκτήτης</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Treasurer")">Ταμίας</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Secretary")">Γραμματέας</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Staff")">Προσωπικό</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Viewer")">Θεατής</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="string" @bind-Value="selectedStatusString" 
+                       Label="Κατάσταση"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem T="string" Value="@((string)null!)">Όλες</MudSelectItem>
+                <MudSelectItem T="string" Value="@("true")">Ενεργοί</MudSelectItem>
+                <MudSelectItem T="string" Value="@("false")">Ανενεργοί</MudSelectItem>
+            </MudSelect>
+        </div>
+
+        <!-- Desktop Data Table -->
+        <MudHidden Breakpoint="Breakpoint.SmAndDown">
+            <MudDataGrid Items="@filteredUsers" 
+                     Dense="true" 
+                     Hover="true" 
+                     Bordered="true" 
+                     Striped="true"
+                     Loading="@loading"
+                     LoadingProgressColor="Color.Primary"
+                     Class="thick-borders">
+            <Columns>
+                <PropertyColumn Property="x => x.Username" Title="Όνομα Χρήστη" />
+                <PropertyColumn Property="x => x.FullName" Title="Ονοματεπώνυμο" />
+                <PropertyColumn Property="x => x.Phone" Title="Τηλέφωνο" />
+                <PropertyColumn Property="x => x.Email" Title="Email" />
+                <TemplateColumn Title="Ρόλος">
+                    <CellTemplate>
+                        <MudChip T="string" Size="Size.Small" 
+                                 Color="@GetRoleColor(context.Item.Role)">
+                            @GetRoleText(context.Item.Role)
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Κατάσταση">
+                    <CellTemplate>
+                        <MudChip T="string" Size="Size.Small" 
+                                 Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
+                            @(context.Item.IsActive ? "Ενεργός" : "Ανενεργός")
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Τελευταία Σύνδεση">
+                    <CellTemplate>
+                        @if (context.Item.LastLoginAt.HasValue)
+                        {
+                            @context.Item.LastLoginAt.Value.ToString("dd/MM/yyyy HH:mm")
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Default">Ποτέ</MudText>
+                        }
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Ενέργειες" Sortable="false">
+                    <CellTemplate>
+                        <div class="d-flex gap-2">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                           Size="Size.Small" 
+                                           Color="Color.Primary"
+                                           Variant="Variant.Filled"
+                                           OnClick="() => EditUser(context.Item)" 
+                                           title="Επεξεργασία" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Lock" 
+                                           Size="Size.Small" 
+                                           Color="Color.Info"
+                                           Variant="Variant.Filled"
+                                           OnClick="() => ResetPassword(context.Item)"
+                                           title="Επαναφορά Κωδικού" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                           Size="Size.Small" 
+                                           Color="Color.Error"
+                                           Variant="Variant.Filled"
+                                           OnClick="() => DeleteUser(context.Item)"
+                                           title="Διαγραφή" />
+                        </div>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            </MudDataGrid>
+        </MudHidden>
+
+        <!-- Mobile Cards -->
+        <MudHidden Breakpoint="Breakpoint.MdAndUp">
+            <MudGrid>
+                @foreach (var user in filteredUsers)
+                {
+                    <MudItem xs="12">
+                        <MudCard Class="mb-3">
+                            <MudCardContent>
+                                <div class="d-flex justify-space-between align-center mb-2">
+                                    <MudText Typo="Typo.h6">@user.FullName</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="@(user.IsActive ? Color.Success : Color.Default)">
+                                        @(user.IsActive ? "Ενεργός" : "Ανενεργός")
+                                    </MudChip>
+                                </div>
+                                <MudText Typo="Typo.body2" Class="mb-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" /> @user.Username
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mb-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" /> @user.Phone
+                                </MudText>
+                                @if (!string.IsNullOrEmpty(user.Email))
+                                {
+                                    <MudText Typo="Typo.body2" Class="mb-1">
+                                        <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" /> @user.Email
+                                    </MudText>
+                                }
+                                <MudText Typo="Typo.body2" Class="mb-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Small" /> @GetRoleText(user.Role)
+                                </MudText>
+                                @if (user.LastLoginAt.HasValue)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Default">
+                                        Τελ. σύνδεση: @user.LastLoginAt.Value.ToString("dd/MM/yyyy HH:mm")
+                                    </MudText>
+                                }
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                               Size="Size.Small" 
+                                               Color="Color.Primary"
+                                               OnClick="() => EditUser(user)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Lock" 
+                                               Size="Size.Small" 
+                                               Color="Color.Info"
+                                               OnClick="() => ResetPassword(user)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                               Size="Size.Small" 
+                                               Color="Color.Error"
+                                               OnClick="() => DeleteUser(user)" />
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudHidden>
+
+        @if (!filteredUsers.Any() && !loading)
+        {
+            <div class="text-center pa-8">
+                <MudIcon Icon="Icons.Material.Filled.PersonOff" Size="Size.Large" Color="Color.Default" />
+                <MudText Typo="Typo.h6" Color="Color.Default" Class="mt-2">
+                    Δεν βρέθηκαν χρήστες με αυτά τα κριτήρια
+                </MudText>
+            </div>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<User> users = new();
+    private bool loading = true;
+    
+    private string searchString = "";
+    private string? selectedRoleString = null;
+    private string? selectedStatusString = null;
+    
+    private UserRole? selectedRole => string.IsNullOrEmpty(selectedRoleString) ? null : Enum.Parse<UserRole>(selectedRoleString);
+    private bool? selectedStatus => selectedStatusString switch 
+    { 
+        "true" => true, 
+        "false" => false, 
+        _ => null 
+    };
+    
+    private int totalUsers => users.Count;
+    private int activeUsers => users.Count(u => u.IsActive);
+    private int adminUsers => users.Count(u => u.Role == UserRole.Admin || u.Role == UserRole.Owner);
+    
+    private IEnumerable<User> filteredUsers => users.Where(u =>
+        (string.IsNullOrWhiteSpace(searchString) ||
+         u.FullName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+         u.Username.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+         u.Phone.Contains(searchString) ||
+         (u.Email?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false)) &&
+        (selectedRole == null || u.Role == selectedRole) &&
+        (selectedStatus == null || u.IsActive == selectedStatus)
+    );
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+    
+    private async Task LoadData()
+    {
+        loading = true;
+        
+        try
+        {
+            using var scope = ScopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<MembersHubContext>();
+            
+            users = await dbContext.Users
+                .OrderBy(u => u.Username)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης δεδομένων: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+    
+    private Color GetRoleColor(UserRole role) => role switch
+    {
+        UserRole.Admin or UserRole.Owner => Color.Error,
+        UserRole.Treasurer => Color.Warning,
+        UserRole.Secretary => Color.Info,
+        UserRole.Staff => Color.Primary,
+        UserRole.Viewer => Color.Default,
+        _ => Color.Default
+    };
+    
+    private string GetRoleText(UserRole role) => role switch
+    {
+        UserRole.Admin => "Διαχειριστής",
+        UserRole.Owner => "Ιδιοκτήτης",
+        UserRole.Treasurer => "Ταμίας",
+        UserRole.Secretary => "Γραμματέας",
+        UserRole.Staff => "Προσωπικό",
+        UserRole.Viewer => "Θεατής",
+        _ => "Άγνωστο"
+    };
+    
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions 
+        { 
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+        
+        var dialog = await DialogService.ShowAsync<UserDialog>(
+            "Νέος Χρήστης", 
+            options);
+        
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+    
+    private async Task EditUser(User user)
+    {
+        var parameters = new DialogParameters<UserDialog>
+        {
+            { x => x.ExistingUser, user }
+        };
+        
+        var options = new DialogOptions 
+        { 
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+        
+        var dialog = await DialogService.ShowAsync<UserDialog>(
+            $"Επεξεργασία Χρήστη: {user.FullName}", 
+            parameters, 
+            options);
+        
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+    
+    private async Task ResetPassword(User user)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Επαναφορά Κωδικού",
+            $"Θέλετε να επαναφέρετε τον κωδικό του χρήστη '{user.FullName}';",
+            yesText: "Επαναφορά",
+            cancelText: "Άκυρο");
+            
+        if (result == true)
+        {
+            try
+            {
+                using var scope = ScopeFactory.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<MembersHubContext>();
+                var authService = scope.ServiceProvider.GetRequiredService<IAuthenticationService>();
+                
+                // Δημιουργούμε έναν ασφαλή προσωρινό κωδικό
+                string tempPassword = GenerateSecureTemporaryPassword();
+                
+                var userToUpdate = await dbContext.Users.FindAsync(user.Id);
+                if (userToUpdate != null)
+                {
+                    // Hash του νέου κωδικού
+                    userToUpdate.PasswordHash = await authService.HashPasswordAsync(tempPassword);
+                    userToUpdate.UpdatedAt = DateTime.UtcNow;
+                    
+                    await dbContext.SaveChangesAsync();
+                    
+                    // Audit logging για password reset
+                    var currentUser = await SessionService.GetCurrentUserAsync();
+                    if (currentUser != null)
+                    {
+                        await AuditService.LogAsync(
+                            action: AuditAction.PasswordReset,
+                            entityType: "User",
+                            entityId: user.Id.ToString(),
+                            entityName: user.FullName,
+                            description: $"Επαναφορά κωδικού για χρήστη '{user.FullName}'",
+                            userId: currentUser.Id,
+                            username: currentUser.Username,
+                            fullName: currentUser.FullName,
+                            ipAddress: HttpContextInfo.GetIpAddress(),
+                            userAgent: HttpContextInfo.GetUserAgent()
+                        );
+                    }
+                    
+                    // Εμφάνιση του προσωρινού κωδικού με διάλογο
+                    await DialogService.ShowMessageBox(
+                        "Επιτυχής Επαναφορά Κωδικού",
+                        $"Ο κωδικός επαναφέρθηκε επιτυχώς!\n\nΠροσωρινός κωδικός: {tempPassword}\n\nΠαρακαλώ σημειώστε τον κωδικό και ενημερώστε τον χρήστη.",
+                        yesText: "OK");
+                    
+                    Snackbar.Add($"Ο κωδικός του χρήστη '{user.FullName}' επαναφέρθηκε", Severity.Success);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Σφάλμα επαναφοράς κωδικού: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+    
+    private async Task DeleteUser(User user)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Διαγραφή Χρήστη",
+            $"Είστε σίγουροι ότι θέλετε να διαγράψετε τον χρήστη '{user.FullName}';",
+            yesText: "Διαγραφή",
+            cancelText: "Άκυρο");
+            
+        if (result == true)
+        {
+            try
+            {
+                using var scope = ScopeFactory.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<MembersHubContext>();
+                
+                var userToDelete = await dbContext.Users.FindAsync(user.Id);
+                if (userToDelete != null)
+                {
+                    // Audit logging για user deletion (πριν τη διαγραφή)
+                    var currentUser = await SessionService.GetCurrentUserAsync();
+                    if (currentUser != null)
+                    {
+                        await AuditService.LogDeleteAsync(userToDelete, 
+                            currentUser.Id, currentUser.Username, currentUser.FullName, 
+                            HttpContextInfo.GetIpAddress());
+                    }
+                    
+                    dbContext.Users.Remove(userToDelete);
+                    await dbContext.SaveChangesAsync();
+                    
+                    await LoadData();
+                    StateHasChanged();
+                    
+                    Snackbar.Add($"Ο χρήστης '{user.FullName}' διαγράφηκε επιτυχώς", Severity.Success);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Σφάλμα διαγραφής: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Δημιουργεί έναν ασφαλή προσωρινό κωδικό με κρυπτογραφικό random generator
+    /// </summary>
+    private static string GenerateSecureTemporaryPassword()
+    {
+        const string uppercaseChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const string lowercaseChars = "abcdefghijklmnopqrstuvwxyz";
+        const string digitChars = "0123456789";
+        const string specialChars = "!@#$%^&*";
+        
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        
+        // Εξασφαλίζουμε ότι έχουμε τουλάχιστον έναν χαρακτήρα από κάθε κατηγορία
+        var password = new char[12]; // 12-character password
+        
+        // Ένας από κάθε τύπο (εξασφαλίζει πολυπλοκότητα)
+        password[0] = GetRandomChar(rng, uppercaseChars);
+        password[1] = GetRandomChar(rng, lowercaseChars);
+        password[2] = GetRandomChar(rng, digitChars);
+        password[3] = GetRandomChar(rng, specialChars);
+        
+        // Γεμίζουμε τις υπόλοιπες θέσεις με τυχαίους χαρακτήρες από όλες τις κατηγορίες
+        const string allChars = uppercaseChars + lowercaseChars + digitChars + specialChars;
+        for (int i = 4; i < password.Length; i++)
+        {
+            password[i] = GetRandomChar(rng, allChars);
+        }
+        
+        // Ανακατεύουμε τη σειρά για να μην είναι προβλέψιμη η δομή
+        ShuffleArray(rng, password);
+        
+        return new string(password);
+    }
+    
+    private static char GetRandomChar(System.Security.Cryptography.RandomNumberGenerator rng, string chars)
+    {
+        var randomBytes = new byte[4];
+        rng.GetBytes(randomBytes);
+        var randomValue = BitConverter.ToUInt32(randomBytes, 0);
+        return chars[(int)(randomValue % (uint)chars.Length)];
+    }
+    
+    private static void ShuffleArray(System.Security.Cryptography.RandomNumberGenerator rng, char[] array)
+    {
+        for (int i = array.Length - 1; i > 0; i--)
+        {
+            var randomBytes = new byte[4];
+            rng.GetBytes(randomBytes);
+            var randomValue = BitConverter.ToUInt32(randomBytes, 0);
+            int j = (int)(randomValue % (uint)(i + 1));
+            
+            // Swap
+            (array[i], array[j]) = (array[j], array[i]);
+        }
+    }
+}

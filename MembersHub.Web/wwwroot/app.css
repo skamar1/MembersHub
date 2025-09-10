@@ -58,3 +58,69 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* Thicker borders for MudDataGrid */
+.mud-table {
+    border: 2px solid var(--mud-palette-table-lines) !important;
+}
+
+.mud-table-head .mud-table-cell {
+    border-bottom: 2px solid var(--mud-palette-table-lines) !important;
+}
+
+.mud-table-body .mud-table-row {
+    border-bottom: 2px solid var(--mud-palette-table-lines) !important;
+}
+
+.mud-table-body .mud-table-cell {
+    border-right: 2px solid var(--mud-palette-table-lines) !important;
+}
+
+.mud-table-body .mud-table-cell:last-child {
+    border-right: none !important;
+}
+
+/* Thicker borders for MudDataGrid specifically */
+.mud-data-grid {
+    border: 2px solid var(--mud-palette-table-lines) !important;
+}
+
+.mud-data-grid .mud-table-head .mud-table-cell {
+    border-bottom: 2px solid var(--mud-palette-table-lines) !important;
+    border-right: 2px solid var(--mud-palette-table-lines) !important;
+}
+
+.mud-data-grid .mud-table-body .mud-table-row {
+    border-bottom: 2px solid var(--mud-palette-table-lines) !important;
+}
+
+.mud-data-grid .mud-table-body .mud-table-cell {
+    border-right: 2px solid var(--mud-palette-table-lines) !important;
+}
+
+.mud-data-grid .mud-table-head .mud-table-cell:last-child,
+.mud-data-grid .mud-table-body .mud-table-cell:last-child {
+    border-right: none !important;
+}
+
+/* Alternative: Use specific color if MudBlazor variables don't work */
+.thick-borders .mud-table,
+.thick-borders .mud-data-grid {
+    border: 3px solid #dee2e6 !important;
+}
+
+.thick-borders .mud-table-head .mud-table-cell,
+.thick-borders .mud-data-grid .mud-table-head .mud-table-cell {
+    border-bottom: 3px solid #dee2e6 !important;
+    border-right: 2px solid #dee2e6 !important;
+}
+
+.thick-borders .mud-table-body .mud-table-row,
+.thick-borders .mud-data-grid .mud-table-body .mud-table-row {
+    border-bottom: 2px solid #dee2e6 !important;
+}
+
+.thick-borders .mud-table-body .mud-table-cell,
+.thick-borders .mud-data-grid .mud-table-body .mud-table-cell {
+    border-right: 2px solid #dee2e6 !important;
+}

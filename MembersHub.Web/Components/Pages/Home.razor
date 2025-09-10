@@ -1,7 +1,109 @@
 ﻿@page "/"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@attribute [Authorize]
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Αρχική - MembersHub</PageTitle>
 
-<h1>Hello, world!</h1>
-
-Welcome to your new app.
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8">
+    <AuthorizeView>
+        <Authorized>
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h3" Color="Color.Primary" Align="Align.Center">
+                        Καλώς ήρθατε στο MembersHub
+                    </MudText>
+                    <MudText Typo="Typo.h6" Align="Align.Center" Class="mt-2">
+                        Γεια σου, @context.User.FindFirst("FullName")?.Value!
+                    </MudText>
+                </MudItem>
+                
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Large" Color="Color.Primary" />
+                            <MudText Typo="Typo.h6">Διαχείριση Μελών</MudText>
+                            <MudText Typo="Typo.body2">Διαχειριστείτε τα μέλη του συλλόγου</MudText>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/members">
+                                Μετάβαση
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+                
+                <AuthorizeView Roles="Admin,Owner" Context="userContext">
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="Size.Large" Color="Color.Secondary" />
+                                <MudText Typo="Typo.h6">Διαχείριση Χρηστών</MudText>
+                                <MudText Typo="Typo.body2">Διαχειριστείτε τους χρήστες του συστήματος</MudText>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudButton Variant="Variant.Text" Color="Color.Secondary" Href="/users">
+                                    Μετάβαση
+                                </MudButton>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                </AuthorizeView>
+                
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Success" />
+                            <MudText Typo="Typo.h6">Οικονομικά</MudText>
+                            <MudText Typo="Typo.body2">Διαχείριση συνδρομών και εξόδων</MudText>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Text" Color="Color.Success" Disabled="true">
+                                Σύντομα
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+                
+                <AuthorizeView Roles="Admin,Owner" Context="auditContext">
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" Color="Color.Dark" />
+                                <MudText Typo="Typo.h6">Ιστορικό Ενεργειών</MudText>
+                                <MudText Typo="Typo.body2">Καταγραφή όλων των ενεργειών χρηστών</MudText>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudButton Variant="Variant.Text" Color="Color.Dark" Href="/audit-logs">
+                                    Προβολή
+                                </MudButton>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                </AuthorizeView>
+            </MudGrid>
+        </Authorized>
+        <NotAuthorized>
+            <MudGrid Justify="Justify.Center">
+                <MudItem xs="12" sm="8" md="6">
+                    <MudCard Elevation="8">
+                        <MudCardContent Class="text-center pa-8">
+                            <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
+                            <MudText Typo="Typo.h4" Color="Color.Primary">MembersHub</MudText>
+                            <MudText Typo="Typo.h6" Class="mt-4">Σύστημα Διαχείρισης Μελών</MudText>
+                            <MudText Typo="Typo.body1" Class="mt-2">
+                                Παρακαλώ συνδεθείτε για να αποκτήσετε πρόσβαση στο σύστημα
+                            </MudText>
+                        </MudCardContent>
+                        <MudCardActions Class="justify-center pb-4">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Href="/login">
+                                Σύνδεση
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        </NotAuthorized>
+    </AuthorizeView>
+</MudContainer>

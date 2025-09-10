@@ -1,0 +1,447 @@
+@page "/email-settings"
+@using MudBlazor
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize(Roles = "Admin,Owner")]
+@inject IEmailConfigurationService EmailConfigService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Ρυθμίσεις Email - MembersHub</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Email" Class="mr-2" />
+        Ρυθμίσεις Email
+    </MudText>
+
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="3">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-2" />
+                    @(editingSettings?.Id > 0 ? "Επεξεργασία" : "Νέα Ρύθμιση")
+                </MudText>
+
+                <MudForm @ref="form" @bind-IsValid="@isFormValid">
+                    <MudTextField @bind-Value="currentSettings.SmtpHost"
+                                  Label="SMTP Server"
+                                  Required="true"
+                                  RequiredError="Το SMTP Server είναι υποχρεωτικό"
+                                  Class="mb-3" />
+
+                    <MudNumericField @bind-Value="currentSettings.SmtpPort"
+                                     Label="Port"
+                                     Required="true"
+                                     Min="1"
+                                     Max="65535"
+                                     RequiredError="Το Port είναι υποχρεωτικό"
+                                     Class="mb-3" />
+
+                    <MudTextField @bind-Value="currentSettings.Username"
+                                  Label="Username"
+                                  Required="true"
+                                  RequiredError="Το Username είναι υποχρεωτικό"
+                                  Class="mb-3" />
+
+                    <MudTextField @bind-Value="currentSettings.DecryptedPassword"
+                                  Label="Password"
+                                  InputType="@passwordInput"
+                                  Required="true"
+                                  RequiredError="Ο κωδικός είναι υποχρεωτικός"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@passwordInputIcon"
+                                  OnAdornmentClick="TogglePasswordVisibility"
+                                  Class="mb-3" />
+
+                    <MudTextField @bind-Value="currentSettings.FromEmail"
+                                  Label="From Email"
+                                  Required="true"
+                                  RequiredError="Το From Email είναι υποχρεωτικό"
+                                  Class="mb-3" />
+
+                    <MudTextField @bind-Value="currentSettings.FromName"
+                                  Label="From Name"
+                                  Required="true"
+                                  RequiredError="Το From Name είναι υποχρεωτικό"
+                                  Class="mb-3" />
+
+                    <MudCheckBox @bind-Value="currentSettings.EnableSsl"
+                                 Label="Enable SSL"
+                                 Color="Color.Primary"
+                                 Class="mb-3" />
+
+                    <MudCheckBox @bind-Value="currentSettings.IsActive"
+                                 Label="Ενεργή Ρύθμιση"
+                                 Color="Color.Primary"
+                                 Class="mb-3" />
+
+                    <MudTextField @bind-Value="currentSettings.PasswordResetSubject"
+                                  Label="Password Reset Subject"
+                                  Lines="2"
+                                  Class="mb-3" />
+
+                    <MudTextField @bind-Value="currentSettings.PasswordResetTemplate"
+                                  Label="Password Reset Template"
+                                  Lines="5"
+                                  Class="mb-3" />
+
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       OnClick="SaveSettings"
+                                       Disabled="@(!isFormValid || isSaving)">
+                                @if (isSaving)
+                                {
+                                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                                    <MudText Class="ms-2">Αποθήκευση...</MudText>
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-2" />
+                                    <MudText>Αποθήκευση</MudText>
+                                }
+                            </MudButton>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Secondary"
+                                       FullWidth="true"
+                                       OnClick="TestConnection"
+                                       Disabled="@(!isFormValid || isTesting)">
+                                @if (isTesting)
+                                {
+                                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                                    <MudText Class="ms-2">Δοκιμή...</MudText>
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.NetworkCheck" Class="mr-2" />
+                                    <MudText>Δοκιμή</MudText>
+                                }
+                            </MudButton>
+                        </MudItem>
+                        @if (editingSettings?.Id > 0)
+                        {
+                            <MudItem xs="12">
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Default"
+                                           FullWidth="true"
+                                           OnClick="CancelEdit"
+                                           Class="mt-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-2" />
+                                    Ακύρωση
+                                </MudButton>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudForm>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Elevation="3">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.List" Class="mr-2" />
+                    Αποθηκευμένες Ρυθμίσεις
+                </MudText>
+
+                @if (isLoadingSettings)
+                {
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                }
+                else if (emailSettingsList.Any())
+                {
+                    <MudTable Items="@emailSettingsList" Dense="true" Hover="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>SMTP Server</MudTh>
+                            <MudTh>Port</MudTh>
+                            <MudTh>Username</MudTh>
+                            <MudTh>From Email</MudTh>
+                            <MudTh>Κατάσταση</MudTh>
+                            <MudTh>Ημ/νία</MudTh>
+                            <MudTh>Ενέργειες</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.SmtpHost</MudTd>
+                            <MudTd>@context.SmtpPort</MudTd>
+                            <MudTd>@context.Username</MudTd>
+                            <MudTd>@context.FromEmail</MudTd>
+                            <MudTd>
+                                @if (context.IsActive)
+                                {
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Ενεργή</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Default" Size="Size.Small">Ανενεργή</MudChip>
+                                }
+                            </MudTd>
+                            <MudTd>@context.UpdatedAt.ToString("dd/MM/yyyy")</MudTd>
+                            <MudTd>
+                                <MudButtonGroup Size="Size.Small" Variant="Variant.Text">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   OnClick="() => EditSettings(context)" />
+                                    @if (!context.IsActive)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
+                                                       Color="Color.Success"
+                                                       Size="Size.Small"
+                                                       OnClick="() => ActivateSettings(context.Id)" />
+                                    }
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   OnClick="() => ConfirmDelete(context)" />
+                                </MudButtonGroup>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-4">
+                        Δεν υπάρχουν αποθηκευμένες ρυθμίσεις email. Προσθέστε μία νέα ρύθμιση για να ξεκινήσετε.
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private MudForm form = null!;
+    private bool isFormValid;
+    private bool isSaving;
+    private bool isTesting;
+    private bool isLoadingSettings = true;
+    private bool isPasswordVisible;
+    private InputType passwordInput = InputType.Password;
+    private string passwordInputIcon = Icons.Material.Filled.VisibilityOff;
+
+    private MembersHub.Core.Entities.EmailSettings currentSettings = new();
+    private MembersHub.Core.Entities.EmailSettings? editingSettings;
+    private List<MembersHub.Core.Entities.EmailSettings> emailSettingsList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmailSettings();
+        
+        // Set default template if empty
+        if (string.IsNullOrWhiteSpace(currentSettings.PasswordResetTemplate))
+        {
+            currentSettings.PasswordResetTemplate = GetDefaultPasswordResetTemplate();
+        }
+    }
+
+    private async Task LoadEmailSettings()
+    {
+        isLoadingSettings = true;
+        try
+        {
+            emailSettingsList = await EmailConfigService.GetAllEmailSettingsAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης ρυθμίσεων: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoadingSettings = false;
+            StateHasChanged();
+        }
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        if (isPasswordVisible)
+        {
+            isPasswordVisible = false;
+            passwordInputIcon = Icons.Material.Filled.VisibilityOff;
+            passwordInput = InputType.Password;
+        }
+        else
+        {
+            isPasswordVisible = true;
+            passwordInputIcon = Icons.Material.Filled.Visibility;
+            passwordInput = InputType.Text;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        await form.Validate();
+        if (!isFormValid) return;
+
+        isSaving = true;
+        try
+        {
+            var currentUser = await GetCurrentUserAsync();
+
+            if (editingSettings?.Id > 0)
+            {
+                currentSettings.Id = editingSettings.Id;
+                await EmailConfigService.UpdateEmailSettingsAsync(currentSettings, currentUser);
+                Snackbar.Add("Οι ρυθμίσεις email ενημερώθηκαν επιτυχώς!", Severity.Success);
+                editingSettings = null;
+            }
+            else
+            {
+                await EmailConfigService.CreateEmailSettingsAsync(currentSettings, currentUser);
+                Snackbar.Add("Οι ρυθμίσεις email αποθηκεύτηκαν επιτυχώς!", Severity.Success);
+            }
+
+            // Reset form
+            currentSettings = new MembersHub.Core.Entities.EmailSettings();
+            if (string.IsNullOrWhiteSpace(currentSettings.PasswordResetTemplate))
+            {
+                currentSettings.PasswordResetTemplate = GetDefaultPasswordResetTemplate();
+            }
+
+            await LoadEmailSettings();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα αποθήκευσης: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task TestConnection()
+    {
+        await form.Validate();
+        if (!isFormValid) return;
+
+        isTesting = true;
+        try
+        {
+            var isConnectionSuccessful = await EmailConfigService.TestEmailConnectionAsync(currentSettings);
+            
+            if (isConnectionSuccessful)
+            {
+                Snackbar.Add("Η σύνδεση email είναι επιτυχής!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Η σύνδεση email απέτυχε. Ελέγξτε τις ρυθμίσεις σας.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα δοκιμής σύνδεσης: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isTesting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void EditSettings(MembersHub.Core.Entities.EmailSettings settings)
+    {
+        editingSettings = settings;
+        currentSettings = new MembersHub.Core.Entities.EmailSettings
+        {
+            Id = settings.Id,
+            SmtpHost = settings.SmtpHost,
+            SmtpPort = settings.SmtpPort,
+            Username = settings.Username,
+            DecryptedPassword = settings.DecryptedPassword,
+            FromEmail = settings.FromEmail,
+            FromName = settings.FromName,
+            EnableSsl = settings.EnableSsl,
+            IsActive = settings.IsActive,
+            PasswordResetSubject = settings.PasswordResetSubject,
+            PasswordResetTemplate = settings.PasswordResetTemplate
+        };
+    }
+
+    private void CancelEdit()
+    {
+        editingSettings = null;
+        currentSettings = new MembersHub.Core.Entities.EmailSettings();
+        if (string.IsNullOrWhiteSpace(currentSettings.PasswordResetTemplate))
+        {
+            currentSettings.PasswordResetTemplate = GetDefaultPasswordResetTemplate();
+        }
+    }
+
+    private async Task ActivateSettings(int id)
+    {
+        try
+        {
+            var currentUser = await GetCurrentUserAsync();
+            await EmailConfigService.SetActiveEmailSettingsAsync(id, currentUser);
+            Snackbar.Add("Η ρύθμιση ενεργοποιήθηκε επιτυχώς!", Severity.Success);
+            await LoadEmailSettings();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα ενεργοποίησης: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConfirmDelete(MembersHub.Core.Entities.EmailSettings settings)
+    {
+        try
+        {
+            await EmailConfigService.DeleteEmailSettingsAsync(settings.Id);
+            Snackbar.Add("Η ρύθμιση διαγράφηκε επιτυχώς!", Severity.Success);
+            await LoadEmailSettings();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα διαγραφής: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task<string> GetCurrentUserAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        return authState.User?.Identity?.Name ?? "System";
+    }
+
+    private static string GetDefaultPasswordResetTemplate()
+    {
+        return @"<html>
+<body style='font-family: Arial, sans-serif;'>
+    <div style='max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;'>
+        <h2 style='color: #7C6FD8; text-align: center;'>Επαναφορά Κωδικού Πρόσβασης</h2>
+        
+        <p>Γεια σας,</p>
+        
+        <p>Λάβαμε αίτημα επαναφοράς του κωδικού πρόσβασής σας για τον λογαριασμό σας στο MembersHub.</p>
+        
+        <div style='text-align: center; margin: 30px 0;'>
+            <a href='{ResetUrl}' style='background-color: #7C6FD8; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;'>
+                Επαναφορά Κωδικού
+            </a>
+        </div>
+        
+        <p>Εναλλακτικά, μπορείτε να αντιγράψετε και να επικολλήσετε τον παρακάτω σύνδεσμο στον browser σας:</p>
+        <p style='word-break: break-all; color: #7C6FD8;'>{ResetUrl}</p>
+        
+        <p><strong>Σημαντικό:</strong> Αυτός ο σύνδεσμος θα λήξει σε 1 ώρα για λόγους ασφαλείας.</p>
+        
+        <p>Εάν δεν ζητήσατε αυτή την επαναφορά, μπορείτε να αγνοήσετε αυτό το email.</p>
+        
+        <hr style='border: none; border-top: 1px solid #ddd; margin: 30px 0;'>
+        
+        <p style='font-size: 12px; color: #666; text-align: center;'>
+            © 2025 MembersHub. Όλα τα δικαιώματα διατηρούνται.
+        </p>
+    </div>
+</body>
+</html>";
+    }
+}

@@ -1,9 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet workload install:*)",
-      "Bash(sudo dotnet workload install:*)",
-      "Bash(dotnet:*)"
+      "Bash(dotnet ef migrations:*)",
+      "Bash(dotnet ef database update:*)",
+      "Bash(ping:*)",
+      "Bash(nc:*)",
+      "Bash(dotnet add package:*)",
+      "Bash(sqlcmd:*)",
+      "Bash(dotnet run:*)",
+      "Bash(dotnet build)",
+      "Bash(pkill:*)",
+      "Bash(sudo killall:*)",
+      "Bash(killall:*)",
+      "Bash(sudo pkill:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(dotnet clean:*)",
+      "Bash(find:*)",
+      "Bash(/bashes)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

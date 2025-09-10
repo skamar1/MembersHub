@@ -1,0 +1,21 @@
+@inherits LayoutComponentBase
+@using MudBlazor
+
+<MudThemeProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div class="login-background">
+    @Body
+</div>
+
+<style>
+    .login-background {
+        min-height: 100vh;
+        background: #7C6FD8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+</style>

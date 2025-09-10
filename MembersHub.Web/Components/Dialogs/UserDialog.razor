@@ -1,0 +1,379 @@
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using Microsoft.EntityFrameworkCore
+@using MembersHub.Infrastructure.Data
+@using System.ComponentModel.DataAnnotations
+@using MudBlazor
+@inject MembersHubContext DbContext
+@inject ISnackbar Snackbar
+@inject IAuthenticationService AuthService
+@inject IAuditService AuditService
+@inject ISessionService SessionService
+@inject IHttpContextInfoService HttpContextInfo
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="model.FirstName" 
+                                  Label="Όνομα" 
+                                  Required="true" 
+                                  RequiredError="Το όνομα είναι υποχρεωτικό"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="model.LastName" 
+                                  Label="Επώνυμο" 
+                                  Required="true" 
+                                  RequiredError="Το επώνυμο είναι υποχρεωτικό"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="model.Username" 
+                                  Label="Όνομα Χρήστη" 
+                                  Required="true" 
+                                  RequiredError="Το όνομα χρήστη είναι υποχρεωτικό"
+                                  Variant="Variant.Outlined"
+                                  ReadOnly="@IsEdit" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="model.Phone" 
+                                  Label="Τηλέφωνο" 
+                                  Required="true" 
+                                  RequiredError="Το τηλέφωνο είναι υποχρεωτικό"
+                                  Mask="@(new PatternMask("0000000000"))"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="model.Email" 
+                                  Label="Email" 
+                                  InputType="InputType.Email"
+                                  Validation="@(new EmailAddressAttribute() { ErrorMessage = "Μη έγκυρο email" })"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="UserRole" @bind-Value="model.Role" 
+                               Label="Ρόλος Χρήστη" 
+                               Required="true"
+                               RequiredError="Επιλέξτε ρόλο χρήστη"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="UserRole" Value="UserRole.Admin">Διαχειριστής</MudSelectItem>
+                        <MudSelectItem T="UserRole" Value="UserRole.Owner">Ιδιοκτήτης</MudSelectItem>
+                        <MudSelectItem T="UserRole" Value="UserRole.Treasurer">Ταμίας</MudSelectItem>
+                        <MudSelectItem T="UserRole" Value="UserRole.Secretary">Γραμματέας</MudSelectItem>
+                        <MudSelectItem T="UserRole" Value="UserRole.Staff">Προσωπικό</MudSelectItem>
+                        <MudSelectItem T="UserRole" Value="UserRole.Viewer">Θεατής</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                @if (!IsEdit)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="model.Password" 
+                                      Label="Κωδικός Πρόσβασης" 
+                                      InputType="@passwordInput"
+                                      Required="true" 
+                                      RequiredError="Ο κωδικός είναι υποχρεωτικός"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@passwordInputIcon"
+                                      OnAdornmentClick="TogglePasswordVisibility"
+                                      AdornmentAriaLabel="Show Password"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="confirmPassword" 
+                                      Label="Επιβεβαίωση Κωδικού" 
+                                      InputType="@confirmPasswordInput"
+                                      Required="true" 
+                                      RequiredError="Η επιβεβαίωση κωδικού είναι υποχρεωτική"
+                                      Validation="@(new Func<string, string>(ValidatePasswordConfirmation))"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@confirmPasswordInputIcon"
+                                      OnAdornmentClick="ToggleConfirmPasswordVisibility"
+                                      AdornmentAriaLabel="Show Password"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                }
+                @if (IsEdit)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudSwitch @bind-Value="model.IsActive" 
+                                   Label="Ενεργός Χρήστης"
+                                   Color="Color.Primary" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField Value="@(existingUser?.CreatedAt.ToString("dd/MM/yyyy HH:mm"))" 
+                                      Label="Ημερομηνία Δημιουργίας" 
+                                      ReadOnly="true"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Άκυρο</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Submit"
+                   Disabled="@processing">
+            @if (processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Αποθήκευση...</MudText>
+            }
+            else
+            {
+                <MudText>@(IsEdit ? "Ενημέρωση" : "Δημιουργία")</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    public IMudDialogInstance MudDialog { get; set; } = null!;
+    
+    [Parameter] 
+    public User? ExistingUser { get; set; }
+
+    private bool IsEdit => ExistingUser != null;
+    private MudForm form = null!;
+    private bool success;
+    private string[] errors = { };
+    private bool processing = false;
+    
+    private UserModel model = new();
+    private User? existingUser;
+    
+    // Password visibility
+    private bool isPasswordVisible;
+    private InputType passwordInput = InputType.Password;
+    private string passwordInputIcon = Icons.Material.Filled.VisibilityOff;
+    
+    private bool isConfirmPasswordVisible;
+    private InputType confirmPasswordInput = InputType.Password;
+    private string confirmPasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+    
+    private string confirmPassword = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEdit && ExistingUser != null)
+        {
+            existingUser = ExistingUser;
+            // Populate model for editing
+            model = new UserModel
+            {
+                FirstName = existingUser.FirstName,
+                LastName = existingUser.LastName,
+                Username = existingUser.Username,
+                Email = existingUser.Email,
+                Phone = existingUser.Phone,
+                Role = existingUser.Role,
+                IsActive = existingUser.IsActive
+            };
+        }
+        else
+        {
+            // Set default values for new user
+            model.IsActive = true;
+            model.Role = UserRole.Viewer;
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        if (isPasswordVisible)
+        {
+            isPasswordVisible = false;
+            passwordInputIcon = Icons.Material.Filled.VisibilityOff;
+            passwordInput = InputType.Password;
+        }
+        else
+        {
+            isPasswordVisible = true;
+            passwordInputIcon = Icons.Material.Filled.Visibility;
+            passwordInput = InputType.Text;
+        }
+    }
+    
+    private void ToggleConfirmPasswordVisibility()
+    {
+        if (isConfirmPasswordVisible)
+        {
+            isConfirmPasswordVisible = false;
+            confirmPasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+            confirmPasswordInput = InputType.Password;
+        }
+        else
+        {
+            isConfirmPasswordVisible = true;
+            confirmPasswordInputIcon = Icons.Material.Filled.Visibility;
+            confirmPasswordInput = InputType.Text;
+        }
+    }
+    
+    private string ValidatePasswordConfirmation(string confirmPwd)
+    {
+        if (string.IsNullOrEmpty(confirmPwd))
+            return "Η επιβεβαίωση κωδικού είναι υποχρεωτική";
+            
+        if (confirmPwd != model.Password)
+            return "Οι κωδικοί δεν ταιριάζουν";
+            
+        return null!;
+    }
+
+    private async Task Submit()
+    {
+        if (form != null)
+        {
+            await form.Validate();
+            
+            if (!success)
+            {
+                Snackbar.Add("Παρακαλώ διορθώστε τα σφάλματα στη φόρμα", Severity.Warning);
+                return;
+            }
+        }
+        
+        // Additional validation for new users
+        if (!IsEdit && string.IsNullOrEmpty(model.Password))
+        {
+            Snackbar.Add("Ο κωδικός πρόσβασης είναι υποχρεωτικός", Severity.Warning);
+            return;
+        }
+        
+        if (!IsEdit && model.Password != confirmPassword)
+        {
+            Snackbar.Add("Οι κωδικοί πρόσβασης δεν ταιριάζουν", Severity.Warning);
+            return;
+        }
+
+        processing = true;
+        StateHasChanged();
+
+        try
+        {
+            if (IsEdit && existingUser != null)
+            {
+                // Get old values for audit (AsNoTracking για accurate snapshot)
+                var oldUser = await DbContext.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == existingUser.Id);
+                    
+                if (oldUser == null)
+                {
+                    Snackbar.Add("Σφάλμα: Ο χρήστης δεν βρέθηκε", Severity.Error);
+                    return;
+                }
+                
+                // Detach any existing tracked entities to avoid conflicts
+                DbContext.Entry(existingUser).State = EntityState.Detached;
+                
+                // Get fresh entity from database for update
+                var userToUpdate = await DbContext.Users.FindAsync(existingUser.Id);
+                if (userToUpdate == null)
+                {
+                    Snackbar.Add("Σφάλμα: Ο χρήστης δεν βρέθηκε", Severity.Error);
+                    return;
+                }
+                
+                // Update user properties
+                userToUpdate.FirstName = model.FirstName;
+                userToUpdate.LastName = model.LastName;
+                userToUpdate.Email = model.Email;
+                userToUpdate.Phone = model.Phone;
+                userToUpdate.Role = model.Role;
+                userToUpdate.IsActive = model.IsActive;
+                userToUpdate.UpdatedAt = DateTime.UtcNow;
+                
+                // No need to call Update() since userToUpdate is already tracked
+                // DbContext.Users.Update(userToUpdate);
+                await DbContext.SaveChangesAsync();
+                
+                // Audit logging για user update
+                var currentUser = await SessionService.GetCurrentUserAsync();
+                if (currentUser != null)
+                {
+                    await AuditService.LogUpdateAsync(oldUser, userToUpdate, 
+                        currentUser.Id, currentUser.Username, currentUser.FullName, 
+                        HttpContextInfo.GetIpAddress());
+                }
+                
+                Snackbar.Add($"Ο χρήστης '{userToUpdate.FullName}' ενημερώθηκε επιτυχώς", Severity.Success);
+            }
+            else
+            {
+                // Check if username already exists
+                var existingUsername = await DbContext.Users
+                    .AnyAsync(u => u.Username == model.Username);
+                    
+                if (existingUsername)
+                {
+                    Snackbar.Add("Το όνομα χρήστη υπάρχει ήδη", Severity.Error);
+                    return;
+                }
+                
+                // Create new user
+                var newUser = new User
+                {
+                    Username = model.Username,
+                    PasswordHash = await AuthService.HashPasswordAsync(model.Password),
+                    FirstName = model.FirstName,
+                    LastName = model.LastName,
+                    Email = model.Email,
+                    Phone = model.Phone,
+                    Role = model.Role,
+                    IsActive = model.IsActive,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                
+                DbContext.Users.Add(newUser);
+                await DbContext.SaveChangesAsync();
+                
+                // Audit logging για user creation
+                var currentUser = await SessionService.GetCurrentUserAsync();
+                if (currentUser != null)
+                {
+                    await AuditService.LogCreateAsync(newUser, 
+                        currentUser.Id, currentUser.Username, currentUser.FullName, 
+                        HttpContextInfo.GetIpAddress());
+                }
+                
+                Snackbar.Add($"Ο χρήστης '{newUser.FullName}' δημιουργήθηκε επιτυχώς", Severity.Success);
+            }
+            
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            processing = false;
+            StateHasChanged();
+        }
+    }
+    
+
+    public class UserModel
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string? Email { get; set; }
+        public string Phone { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public UserRole Role { get; set; } = UserRole.Viewer;
+        public bool IsActive { get; set; } = true;
+    }
+}

@@ -1,0 +1,312 @@
+@page "/audit-logs"
+@using Microsoft.AspNetCore.Authorization
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Web.Components.Dialogs
+@using MudBlazor
+@attribute [Authorize(Roles = "Admin,Owner")]
+@inject IAuditService AuditService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@attribute [Authorize(Roles = "Admin,Owner")]
+
+<PageTitle>Ιστορικό Ενεργειών - MembersHub</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Color="Color.Primary">
+        📋 Ιστορικό Ενεργειών
+    </MudText>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <!-- Filters -->
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="AuditAction?" @bind-Value="selectedAction" Label="Ενέργεια" Variant="Variant.Outlined" Clearable="true">
+                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)null)">Όλες</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.Login)">Σύνδεση</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.Logout)">Αποσύνδεση</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.LoginFailed)">Αποτυχημένη Σύνδεση</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.MemberCreate)">Δημιουργία Μέλους</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.MemberUpdate)">Ενημέρωση Μέλους</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.MemberDelete)">Διαγραφή Μέλους</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.UserCreate)">Δημιουργία Χρήστη</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.UserUpdate)">Ενημέρωση Χρήστη</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.UserDelete)">Διαγραφή Χρήστη</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudTextField @bind-Value="entityTypeFilter" Label="Τύπος Οντότητας" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker @bind-Date="fromDate" Label="Από Ημερομηνία" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker @bind-Date="toDate" Label="Έως Ημερομηνία" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="4">
+                <MudTextField @bind-Value="usernameFilter" Label="Όνομα Χρήστη" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadAuditLogs">
+                    <MudIcon Icon="Icons.Material.Filled.Search" Class="mr-2" />
+                    Αναζήτηση
+                </MudButton>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearFilters">
+                    <MudIcon Icon="Icons.Material.Filled.Clear" Class="mr-2" />
+                    Καθαρισμός
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Statistics -->
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            <MudBadge Content="@totalRecords" Color="Color.Primary" Overlap="true">
+                <MudButton Variant="Variant.Outlined" StartIcon="Icons.Material.Filled.List">
+                    Σύνολο Εγγραφών
+                </MudButton>
+            </MudBadge>
+            <MudBadge Content="@loginCount" Color="Color.Success" Overlap="true">
+                <MudButton Variant="Variant.Outlined" StartIcon="Icons.Material.Filled.Login">
+                    Συνδέσεις
+                </MudButton>
+            </MudBadge>
+            <MudBadge Content="@failedLoginCount" Color="Color.Error" Overlap="true">
+                <MudButton Variant="Variant.Outlined" StartIcon="Icons.Material.Filled.Block">
+                    Αποτυχημένες Συνδέσεις
+                </MudButton>
+            </MudBadge>
+        </div>
+
+        <!-- Data Table -->
+        <MudDataGrid @ref="dataGrid" Items="@auditLogs" Loading="@loading" Filterable="false" SortMode="@SortMode.None">
+            <Columns>
+                <PropertyColumn Property="x => x.Timestamp" Title="Χρόνος" Format="dd/MM/yyyy HH:mm:ss">
+                    <CellTemplate>
+                        <MudText>@context.Item.Timestamp.ToString("dd/MM/yyyy HH:mm:ss")</MudText>
+                    </CellTemplate>
+                </PropertyColumn>
+                
+                <PropertyColumn Property="x => x.FullName" Title="Χρήστης">
+                    <CellTemplate>
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@GetUserIcon(context.Item.Action)" Size="Size.Small" Class="mr-2" Color="@GetActionColor(context.Item.Action)" />
+                            <MudText>@context.Item.FullName (@context.Item.Username)</MudText>
+                        </div>
+                    </CellTemplate>
+                </PropertyColumn>
+                
+                <PropertyColumn Property="x => x.Action" Title="Ενέργεια">
+                    <CellTemplate>
+                        <MudChip Size="Size.Small" Color="@GetActionColor(context.Item.Action)">
+                            @GetActionDisplayName(context.Item.Action)
+                        </MudChip>
+                    </CellTemplate>
+                </PropertyColumn>
+                
+                <PropertyColumn Property="x => x.Description" Title="Περιγραφή">
+                    <CellTemplate>
+                        <MudText Style="max-width: 300px;" Class="text-truncate">@context.Item.Description</MudText>
+                    </CellTemplate>
+                </PropertyColumn>
+                
+                <PropertyColumn Property="x => x.IpAddress" Title="IP Address">
+                    <CellTemplate>
+                        <MudText Typo="Typo.body2">@(context.Item.IpAddress ?? "-")</MudText>
+                    </CellTemplate>
+                </PropertyColumn>
+
+                <TemplateColumn Title="Ενέργειες">
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                       Size="Size.Small" 
+                                       Color="Color.Info" 
+                                       OnClick="@(() => ViewDetails(context.Item))" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+
+        <!-- Pagination -->
+        <div class="d-flex justify-space-between align-center mt-4">
+            <MudText Typo="Typo.body2">
+                Εμφάνιση @((currentPage * pageSize) + 1)-@Math.Min((currentPage + 1) * pageSize, totalRecords) από @totalRecords εγγραφές
+            </MudText>
+            <MudPagination Count="@totalPages" Selected="@currentPage" SelectedChanged="OnPageChanged" />
+        </div>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudDataGrid<AuditLog> dataGrid = null!;
+    private List<AuditLog> auditLogs = new();
+    private bool loading = false;
+    
+    // Filters
+    private AuditAction? selectedAction;
+    private string entityTypeFilter = "";
+    private string usernameFilter = "";
+    private DateTime? fromDate = DateTime.Today.AddDays(-7);
+    private DateTime? toDate = DateTime.Today.AddDays(1);
+    
+    // Pagination
+    private int currentPage = 1;
+    private int pageSize = 25;
+    private int totalRecords = 0;
+    private int totalPages = 0;
+    
+    // Statistics
+    private int loginCount = 0;
+    private int failedLoginCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAuditLogs();
+    }
+
+    private async Task LoadAuditLogs()
+    {
+        if (loading) return; // Prevent multiple concurrent loads
+        
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var skip = (currentPage - 1) * pageSize;
+            
+            // Convert username filter to userId if needed
+            int? userId = null;
+            if (!string.IsNullOrEmpty(usernameFilter))
+            {
+                // For now, we'll search by username in the service
+                // In a real implementation, you might want to first find the user ID
+            }
+
+            // Reset previous data
+            auditLogs.Clear();
+            totalRecords = 0;
+            loginCount = 0;
+            failedLoginCount = 0;
+
+            auditLogs = (await AuditService.GetAuditLogsAsync(
+                userId: userId,
+                action: selectedAction,
+                entityType: string.IsNullOrEmpty(entityTypeFilter) ? null : entityTypeFilter,
+                fromDate: fromDate,
+                toDate: toDate,
+                skip: skip,
+                take: pageSize
+            )).ToList();
+
+            totalRecords = await AuditService.GetAuditLogsCountAsync(
+                userId: userId,
+                action: selectedAction,
+                entityType: string.IsNullOrEmpty(entityTypeFilter) ? null : entityTypeFilter,
+                fromDate: fromDate,
+                toDate: toDate
+            );
+
+            totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
+
+            // Calculate statistics
+            loginCount = auditLogs.Count(x => x.Action == AuditAction.Login);
+            failedLoginCount = auditLogs.Count(x => x.Action == AuditAction.LoginFailed);
+        }
+        catch (Exception ex)
+        {
+            auditLogs.Clear();
+            totalRecords = 0;
+            loginCount = 0;
+            failedLoginCount = 0;
+            Snackbar.Add($"Σφάλμα φόρτωσης δεδομένων: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearFilters()
+    {
+        selectedAction = null;
+        entityTypeFilter = "";
+        usernameFilter = "";
+        fromDate = DateTime.Today.AddDays(-7);
+        toDate = DateTime.Today.AddDays(1);
+        currentPage = 1;
+        await LoadAuditLogs();
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        currentPage = page;
+        await LoadAuditLogs();
+    }
+
+    private async Task ViewDetails(AuditLog auditLog)
+    {
+        var parameters = new DialogParameters<AuditLogDetailsDialog>
+        {
+            { x => x.AuditLog, auditLog }
+        };
+        
+        var options = new DialogOptions 
+        { 
+            CloseButton = true,
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true
+        };
+        
+        await DialogService.ShowAsync<AuditLogDetailsDialog>(
+            $"Λεπτομέρειες Ενέργειας - {GetActionDisplayName(auditLog.Action)}", 
+            parameters,
+            options);
+    }
+
+    private string GetActionDisplayName(AuditAction action) => action switch
+    {
+        AuditAction.Login => "Σύνδεση",
+        AuditAction.Logout => "Αποσύνδεση",
+        AuditAction.LoginFailed => "Αποτυχημένη Σύνδεση",
+        AuditAction.MemberCreate => "Δημιουργία Μέλους",
+        AuditAction.MemberUpdate => "Ενημέρωση Μέλους",
+        AuditAction.MemberDelete => "Διαγραφή Μέλους",
+        AuditAction.UserCreate => "Δημιουργία Χρήστη",
+        AuditAction.UserUpdate => "Ενημέρωση Χρήστη",
+        AuditAction.UserDelete => "Διαγραφή Χρήστη",
+        AuditAction.PaymentCreate => "Νέα Πληρωμή",
+        AuditAction.ExpenseCreate => "Νέο Έξοδο",
+        _ => action.ToString()
+    };
+
+    private Color GetActionColor(AuditAction action) => action switch
+    {
+        AuditAction.Login => Color.Success,
+        AuditAction.Logout => Color.Info,
+        AuditAction.LoginFailed => Color.Error,
+        AuditAction.MemberCreate or AuditAction.UserCreate or AuditAction.PaymentCreate or AuditAction.ExpenseCreate => Color.Primary,
+        AuditAction.MemberUpdate or AuditAction.UserUpdate => Color.Warning,
+        AuditAction.MemberDelete or AuditAction.UserDelete => Color.Error,
+        AuditAction.UnauthorizedAccess => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetUserIcon(AuditAction action) => action switch
+    {
+        AuditAction.Login => Icons.Material.Filled.Login,
+        AuditAction.Logout => Icons.Material.Filled.Logout,
+        AuditAction.LoginFailed => Icons.Material.Filled.Block,
+        AuditAction.MemberCreate or AuditAction.MemberUpdate or AuditAction.MemberDelete => Icons.Material.Filled.Group,
+        AuditAction.UserCreate or AuditAction.UserUpdate or AuditAction.UserDelete => Icons.Material.Filled.AdminPanelSettings,
+        AuditAction.PaymentCreate => Icons.Material.Filled.Payment,
+        AuditAction.ExpenseCreate => Icons.Material.Filled.Receipt,
+        AuditAction.UnauthorizedAccess => Icons.Material.Filled.Security,
+        _ => Icons.Material.Filled.History
+    };
+}

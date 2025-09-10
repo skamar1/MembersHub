@@ -1,4 +1,14 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Authorization
+@using MembersHub.Core.Interfaces
+@using MembersHub.Web.Services
+@inject ISessionService SessionService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IAuditService AuditService
+@inject IHttpContextInfoService HttpContextInfo
 
 <div class="page">
     <div class="sidebar">
@@ -7,7 +17,23 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="d-flex align-center gap-3">
+                        <MudText>Καλώς ήρθατε, @context.User.FindFirst("FullName")?.Value!</MudText>
+                        <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="Logout">
+                            <MudIcon Icon="@Icons.Material.Filled.Logout" Class="mr-1" />
+                            Αποσύνδεση
+                        </MudButton>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="GoToLogin">
+                        <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-1" />
+                        Σύνδεση
+                    </MudButton>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
 
         <article class="content px-4">
@@ -21,3 +47,27 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private async Task Logout()
+    {
+        // Get current user info before logout
+        var currentUser = await SessionService.GetCurrentUserAsync();
+        
+        if (currentUser != null)
+        {
+            // Log the logout
+            await AuditService.LogLogoutAsync(currentUser.Id, currentUser.Username, currentUser.FullName, 
+                HttpContextInfo.GetIpAddress());
+        }
+        
+        await AuthStateProvider.MarkUserAsLoggedOut();
+        Snackbar.Add("Αποσυνδεθήκατε επιτυχώς", Severity.Info);
+        Navigation.NavigateTo("/login", replace: true);
+    }
+
+    private void GoToLogin()
+    {
+        Navigation.NavigateTo("/login");
+    }
+}
