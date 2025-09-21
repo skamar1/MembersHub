@@ -1,0 +1,246 @@
+@page "/security/dashboard"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@inject MembersHubContext Context
+@inject ISecurityEventService SecurityEventService
+@inject IAccountLockoutService AccountLockoutService
+@inject IAdvancedAuditService AdvancedAuditService
+@inject ISnackbar Snackbar
+@attribute [Authorize(Roles = "Admin,Owner")]
+
+<PageTitle>Security Dashboard</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-6">🔒 Security Dashboard</MudText>
+    
+    <!-- Security Statistics Cards -->
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Recent Login Attempts</MudText>
+                            <MudText Typo="Typo.h5">@recentLogins</MudText>
+                        </div>
+                        <MudIcon Icon="Icons.Material.Filled.Login" Color="Color.Primary" Size="Size.Large" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Failed Attempts</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Error">@failedAttempts</MudText>
+                        </div>
+                        <MudIcon Icon="Icons.Material.Filled.Security" Color="Color.Error" Size="Size.Large" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Locked Accounts</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Warning">@lockedAccounts</MudText>
+                        </div>
+                        <MudIcon Icon="Icons.Material.Filled.Lock" Color="Color.Warning" Size="Size.Large" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Suspicious Activities</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Error">@suspiciousActivities</MudText>
+                        </div>
+                        <MudIcon Icon="Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Recent Security Events -->
+    <MudCard Class="mt-6" Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">🚨 Recent Security Events</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="RefreshData">
+                    <MudIcon Icon="Icons.Material.Filled.Refresh" Class="mr-2" />
+                    Refresh
+                </MudButton>
+            </CardHeaderActions>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudDataGrid T="SecurityEvent" Items="@recentSecurityEvents" Filterable="true" Sortable="true" 
+                         Dense="true" Hover="true" Loading="@loading">
+                <Columns>
+                    <PropertyColumn Property="x => x.CreatedAt" Title="Time" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.User.Username" Title="User" />
+                    <PropertyColumn Property="x => x.EventType" Title="Event" />
+                    <PropertyColumn Property="x => x.IpAddress" Title="IP Address" />
+                    <PropertyColumn Property="x => x.Country" Title="Location" />
+                    <TemplateColumn Title="Status">
+                        <CellTemplate>
+                            @if (context.Item.IsSuccessful)
+                            {
+                                <MudChip Color="Color.Success" Size="Size.Small">Success</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip Color="Color.Error" Size="Size.Small">Failed</MudChip>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Risk">
+                        <CellTemplate>
+                            @if (context.Item.IsSuspicious)
+                            {
+                                <MudChip Color="Color.Warning" Size="Size.Small">Suspicious</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip Color="Color.Default" Size="Size.Small">Normal</MudChip>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Account Lockouts -->
+    <MudCard Class="mt-6" Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">🔒 Account Lockouts</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudDataGrid T="AccountLockout" Items="@recentLockouts" Filterable="true" Sortable="true" 
+                         Dense="true" Hover="true" Loading="@loading">
+                <Columns>
+                    <PropertyColumn Property="x => x.User.Username" Title="User" />
+                    <PropertyColumn Property="x => x.FailedAttempts" Title="Failed Attempts" />
+                    <PropertyColumn Property="x => x.LastAttemptAt" Title="Last Attempt" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.LastAttemptIpAddress" Title="IP Address" />
+                    <TemplateColumn Title="Status">
+                        <CellTemplate>
+                            @if (context.Item.IsLockedOut)
+                            {
+                                <MudChip Color="Color.Error" Size="Size.Small">Locked</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip Color="Color.Success" Size="Size.Small">Active</MudChip>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Actions">
+                        <CellTemplate>
+                            @if (context.Item.IsLockedOut)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                           OnClick="() => UnlockAccount(context.Item.UserId)">
+                                    Unlock
+                                </MudButton>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private bool loading = true;
+    private int recentLogins = 0;
+    private int failedAttempts = 0;
+    private int lockedAccounts = 0;
+    private int suspiciousActivities = 0;
+    
+    private List<SecurityEvent> recentSecurityEvents = new();
+    private List<AccountLockout> recentLockouts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try
+        {
+            await LoadStatistics();
+            await LoadRecentEvents();
+            await LoadAccountLockouts();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task LoadStatistics()
+    {
+        var yesterday = DateTime.UtcNow.AddDays(-1);
+        
+        // Recent login attempts (last 24 hours)
+        var auditLogs = await Context.AuditLogs
+            .Where(a => a.Timestamp >= yesterday && a.Action == AuditAction.Login)
+            .ToListAsync();
+            
+        recentLogins = auditLogs.Count;
+        failedAttempts = auditLogs.Count(a => a.ErrorMessage != null);
+        
+        // Locked accounts
+        lockedAccounts = await Context.AccountLockouts
+            .CountAsync(a => a.LockedUntil.HasValue && a.LockedUntil > DateTime.UtcNow);
+        
+        // Suspicious activities
+        var suspiciousEvents = await SecurityEventService.GetSuspiciousEventsAsync(1);
+        suspiciousActivities = suspiciousEvents.Count;
+    }
+
+    private async Task LoadRecentEvents()
+    {
+        recentSecurityEvents = await SecurityEventService.GetRecentEventsAsync(20);
+    }
+
+    private async Task LoadAccountLockouts()
+    {
+        recentLockouts = await AccountLockoutService.GetRecentLockoutsAsync(7);
+    }
+
+    private async Task RefreshData()
+    {
+        await LoadData();
+        Snackbar.Add("Data refreshed successfully", Severity.Success);
+    }
+
+    private async Task UnlockAccount(int userId)
+    {
+        await AccountLockoutService.UnlockAccountAsync(userId);
+        await LoadAccountLockouts();
+        Snackbar.Add("Account unlocked successfully", Severity.Success);
+    }
+}

@@ -21,6 +21,20 @@ public class MembersHubContext : DbContext
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; } = null!;
     public DbSet<PasswordResetRateLimit> PasswordResetRateLimits { get; set; } = null!;
     public DbSet<EmailSettings> EmailSettings { get; set; } = null!;
+    public DbSet<SecurityEvent> SecurityEvents { get; set; } = null!;
+    public DbSet<UserDevice> UserDevices { get; set; } = null!;
+    public DbSet<PasswordHistory> PasswordHistories { get; set; } = null!;
+    public DbSet<CompromisedPassword> CompromisedPasswords { get; set; } = null!;
+    public DbSet<AccountLockout> AccountLockouts { get; set; } = null!;
+    public DbSet<SecurityNotification> SecurityNotifications { get; set; } = null!;
+    
+    // Financial entities
+    public DbSet<Invoice> Invoices { get; set; } = null!;
+    public DbSet<InvoiceItem> InvoiceItems { get; set; } = null!;
+    public DbSet<PaymentPlan> PaymentPlans { get; set; } = null!;
+    public DbSet<PaymentInstallment> PaymentInstallments { get; set; } = null!;
+    public DbSet<FinancialTransaction> FinancialTransactions { get; set; } = null!;
+    public DbSet<FinancialReport> FinancialReports { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -114,20 +128,29 @@ public class MembersHubContext : DbContext
         modelBuilder.Entity<Expense>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.ExpenseNumber).HasMaxLength(50).IsRequired();
             entity.Property(e => e.Amount).HasColumnType("decimal(10,2)");
-            entity.Property(e => e.Category).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Category).HasConversion<string>();
+            entity.Property(e => e.Status).HasConversion<string>();
             entity.Property(e => e.Description).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Vendor).HasMaxLength(200);
             entity.Property(e => e.ReceiptImagePath).HasMaxLength(500);
+            entity.Property(e => e.ApprovalNotes).HasMaxLength(500);
             
-            entity.HasOne(e => e.Collector)
-                .WithMany(u => u.Expenses)
-                .HasForeignKey(e => e.CollectorId)
+            entity.HasOne(e => e.Submitter)
+                .WithMany()
+                .HasForeignKey(e => e.SubmittedBy)
                 .OnDelete(DeleteBehavior.Restrict);
             
             entity.HasOne(e => e.Approver)
                 .WithMany()
                 .HasForeignKey(e => e.ApprovedBy)
                 .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasIndex(e => e.ExpenseNumber).IsUnique();
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.Category);
+            entity.HasIndex(e => new { e.SubmittedBy, e.Status });
         });
 
         // AuditLog configuration
@@ -143,8 +166,8 @@ public class MembersHubContext : DbContext
             entity.Property(e => e.Description).HasMaxLength(1000).IsRequired();
             entity.Property(e => e.IpAddress).HasMaxLength(45);
             entity.Property(e => e.UserAgent).HasMaxLength(500);
-            entity.Property(e => e.OldValues).HasColumnType("nvarchar(max)");
-            entity.Property(e => e.NewValues).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.OldValues);
+            entity.Property(e => e.NewValues);
             entity.Property(e => e.ErrorMessage).HasMaxLength(1000);
             
             entity.HasOne(e => e.User)
@@ -206,8 +229,263 @@ public class MembersHubContext : DbContext
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
             entity.Property(e => e.PasswordResetSubject).HasMaxLength(200);
-            entity.Property(e => e.PasswordResetTemplate).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.PasswordResetTemplate);
         });
+
+        // PasswordHistory configuration
+        modelBuilder.Entity<PasswordHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PasswordHash).HasMaxLength(255).IsRequired();
+            
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            // Indexes for performance
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => new { e.UserId, e.CreatedAt });
+        });
+
+        // CompromisedPassword configuration
+        modelBuilder.Entity<CompromisedPassword>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PasswordHashSHA1).HasMaxLength(64).IsRequired();
+            
+            // Indexes for performance
+            entity.HasIndex(e => e.PasswordHashSHA1).IsUnique();
+            entity.HasIndex(e => e.LastSeenAt);
+        });
+
+        // AccountLockout configuration
+        modelBuilder.Entity<AccountLockout>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.LastAttemptIpAddress).HasMaxLength(45);
+            entity.Property(e => e.LastAttemptUserAgent).HasMaxLength(500);
+            entity.Property(e => e.LockoutReason).HasMaxLength(200);
+            
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            // Indexes for performance
+            entity.HasIndex(e => e.UserId).IsUnique();
+            entity.HasIndex(e => e.LockedUntil);
+            entity.HasIndex(e => e.LastAttemptAt);
+            entity.HasIndex(e => new { e.UserId, e.LockedUntil });
+        });
+
+        // SecurityNotification configuration
+        modelBuilder.Entity<SecurityNotification>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.NotificationType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Title).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Message).HasMaxLength(1000).IsRequired();
+            entity.Property(e => e.Severity).HasConversion<string>();
+            entity.Property(e => e.IpAddress).HasMaxLength(45);
+            entity.Property(e => e.UserAgent).HasMaxLength(500);
+            entity.Property(e => e.Location).HasMaxLength(100);
+            entity.Property(e => e.AdditionalData);
+            
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            // Indexes for performance
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.IsRead);
+            entity.HasIndex(e => e.Severity);
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => new { e.UserId, e.IsRead });
+            entity.HasIndex(e => new { e.UserId, e.CreatedAt });
+            entity.HasIndex(e => new { e.Severity, e.CreatedAt });
+        });
+
+        // Invoice configuration
+        modelBuilder.Entity<Invoice>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.InvoiceNumber).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.SubtotalAmount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.TaxAmount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.TotalAmount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.PaidAmount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.RemainingAmount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.Status).HasConversion<string>();
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            
+            entity.HasOne(e => e.Member)
+                .WithMany()
+                .HasForeignKey(e => e.MemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.HasOne(e => e.Creator)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.HasIndex(e => e.InvoiceNumber).IsUnique();
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.DueDate);
+            entity.HasIndex(e => new { e.MemberId, e.Status });
+        });
+
+        // InvoiceItem configuration
+        modelBuilder.Entity<InvoiceItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.UnitPrice).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.TotalPrice).HasColumnType("decimal(10,2)");
+            
+            entity.HasOne(e => e.Invoice)
+                .WithMany(i => i.Items)
+                .HasForeignKey(e => e.InvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(e => e.Subscription)
+                .WithMany()
+                .HasForeignKey(e => e.SubscriptionId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // PaymentPlan configuration
+        modelBuilder.Entity<PaymentPlan>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.TotalAmount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.PaidAmount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.RemainingAmount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.Status).HasConversion<string>();
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            
+            entity.HasOne(e => e.Member)
+                .WithMany()
+                .HasForeignKey(e => e.MemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.HasOne(e => e.Creator)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => new { e.MemberId, e.Status });
+        });
+
+        // PaymentInstallment configuration
+        modelBuilder.Entity<PaymentInstallment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Amount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.Status).HasConversion<string>();
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            
+            entity.HasOne(e => e.PaymentPlan)
+                .WithMany(p => p.Installments)
+                .HasForeignKey(e => e.PaymentPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(e => e.Payment)
+                .WithOne(p => p.PaymentInstallment)
+                .HasForeignKey<PaymentInstallment>(e => e.PaymentId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.DueDate);
+            entity.HasIndex(e => new { e.PaymentPlanId, e.Status });
+        });
+
+        // FinancialTransaction configuration
+        modelBuilder.Entity<FinancialTransaction>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TransactionNumber).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Amount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.Type).HasConversion<string>();
+            entity.Property(e => e.Category).HasConversion<string>();
+            entity.Property(e => e.Status).HasConversion<string>();
+            entity.Property(e => e.Description).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Reference).HasMaxLength(100);
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            
+            entity.HasOne(e => e.Member)
+                .WithMany()
+                .HasForeignKey(e => e.MemberId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(e => e.Payment)
+                .WithMany(p => p.Transactions)
+                .HasForeignKey(e => e.PaymentId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(e => e.Expense)
+                .WithMany(e => e.Transactions)
+                .HasForeignKey(e => e.ExpenseId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(e => e.Invoice)
+                .WithMany()
+                .HasForeignKey(e => e.InvoiceId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(e => e.Creator)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.HasIndex(e => e.TransactionNumber).IsUnique();
+            entity.HasIndex(e => e.Type);
+            entity.HasIndex(e => e.Category);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.TransactionDate);
+            entity.HasIndex(e => new { e.Type, e.TransactionDate });
+            entity.HasIndex(e => new { e.Category, e.TransactionDate });
+        });
+
+        // FinancialReport configuration
+        modelBuilder.Entity<FinancialReport>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ReportName).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Type).HasConversion<string>();
+            entity.Property(e => e.ReportData).IsRequired();
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            
+            entity.HasOne(e => e.Generator)
+                .WithMany()
+                .HasForeignKey(e => e.GeneratedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.HasIndex(e => e.Type);
+            entity.HasIndex(e => e.GeneratedAt);
+            entity.HasIndex(e => new { e.Type, e.PeriodStart, e.PeriodEnd });
+        });
+
+        // Update Payment entity configuration
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.Property(e => e.Status).HasConversion<string>();
+            entity.Property(e => e.TransactionReference).HasMaxLength(100);
+            
+            entity.HasOne(e => e.Invoice)
+                .WithMany(i => i.Payments)
+                .HasForeignKey(e => e.InvoiceId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.TransactionReference);
+        });
+
 
         // Seed initial data
         SeedData(modelBuilder);
@@ -228,11 +506,11 @@ public class MembersHubContext : DbContext
             {
                 Id = 1,
                 Username = "admin",
-                FirstName = "Διαχειριστής",
-                LastName = "Συστήματος",
-                Email = "admin@membershub.gr",
+                FirstName = "Αριστείδης",
+                LastName = "Σκαμαγκάκης",
+                Email = "skamar@me.com",
                 Phone = "6900000001",
-                PasswordHash = "AQAAAAIAAYagAAAAEJvhJL5Yk1kqD1FzqC5YwR0N2o5nVfO7qJqZ+3YxD3X1qH7HqGrBqJqZ+3YxD3X1qA==", // This is a placeholder - will be properly hashed
+                PasswordHash = "",
                 Role = UserRole.Admin,
                 IsActive = true,
                 CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),

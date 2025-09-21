@@ -52,7 +52,7 @@ public class PasswordResetService : IPasswordResetService
 
             // Find user by email
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
+                .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == email.ToLower());
 
             // Record the attempt regardless of whether user exists (security best practice)
             await _rateLimitService.RecordAttemptAsync(email, ipAddress);
@@ -75,7 +75,7 @@ public class PasswordResetService : IPasswordResetService
             var resetToken = await _tokenService.GenerateTokenAsync(user.Id, ipAddress, userAgent);
 
             // Send reset email
-            var emailResult = await _emailService.SendPasswordResetEmailAsync(user.Email, resetToken, user.FullName);
+            var emailResult = await _emailService.SendPasswordResetEmailAsync(user.Email!, resetToken, user.FullName);
             if (!emailResult.Success)
             {
                 _logger.LogError("Failed to send password reset email to user {UserId}", user.Id);
@@ -83,14 +83,17 @@ public class PasswordResetService : IPasswordResetService
             }
 
             // Log audit event
-            await _auditService.LogEventAsync(
-                eventType: "PasswordResetRequested",
-                entityName: "User",
+            await _auditService.LogAsync(
+                action: AuditAction.PasswordResetRequested,
+                entityType: "User",
                 entityId: user.Id.ToString(),
-                details: $"Password reset requested for {user.Email}",
+                entityName: user.FullName,
+                description: $"Password reset requested for {user.Email}",
+                userId: user.Id,
+                username: user.Username,
+                fullName: user.FullName,
                 ipAddress: ipAddress,
-                userAgent: userAgent,
-                userId: user.Id
+                userAgent: userAgent
             );
 
             _logger.LogInformation("Password reset requested successfully for user {UserId} from IP {IpAddress}", user.Id, ipAddress);
@@ -166,7 +169,6 @@ public class PasswordResetService : IPasswordResetService
             // Update user password
             user.PasswordHash = hashedPassword;
             user.UpdatedAt = DateTime.UtcNow;
-            user.UpdatedBy = "System-PasswordReset";
 
             // Mark token as used
             await _tokenService.MarkTokenAsUsedAsync(token);
@@ -175,7 +177,7 @@ public class PasswordResetService : IPasswordResetService
             await _context.SaveChangesAsync();
 
             // Send confirmation email
-            var emailResult = await _emailService.SendPasswordResetConfirmationEmailAsync(user.Email, user.FullName);
+            var emailResult = await _emailService.SendPasswordResetConfirmationEmailAsync(user.Email!, user.FullName);
             if (!emailResult.Success)
             {
                 _logger.LogWarning("Failed to send password reset confirmation email to user {UserId}", user.Id);
@@ -183,13 +185,16 @@ public class PasswordResetService : IPasswordResetService
             }
 
             // Log audit event
-            await _auditService.LogEventAsync(
-                eventType: "PasswordResetCompleted",
-                entityName: "User",
+            await _auditService.LogAsync(
+                action: AuditAction.PasswordResetCompleted,
+                entityType: "User",
                 entityId: user.Id.ToString(),
-                details: $"Password successfully reset for {user.Email}",
-                ipAddress: ipAddress,
-                userId: user.Id
+                entityName: user.FullName,
+                description: $"Password successfully reset for {user.Email}",
+                userId: user.Id,
+                username: user.Username,
+                fullName: user.FullName,
+                ipAddress: ipAddress
             );
 
             _logger.LogInformation("Password reset completed successfully for user {UserId} from IP {IpAddress}", user.Id, ipAddress);

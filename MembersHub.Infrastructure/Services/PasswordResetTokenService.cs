@@ -59,10 +59,13 @@ public class PasswordResetTokenService : IPasswordResetTokenService
     public async Task<PasswordResetToken?> GetValidTokenAsync(string token)
     {
         var tokenHash = ComputeTokenHash(token);
+        var now = DateTime.UtcNow;
         
         var resetToken = await _context.PasswordResetTokens
             .Include(t => t.User)
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && t.IsValid);
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && 
+                                    !t.IsUsed && 
+                                    t.ExpiresAt > now);
 
         return resetToken;
     }

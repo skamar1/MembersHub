@@ -1,0 +1,532 @@
+@page "/payments/new"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+@using System.ComponentModel.DataAnnotations
+@using MudBlazor
+@inject IPaymentService PaymentService
+@inject IMemberService MemberService
+@inject ISubscriptionService SubscriptionService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JSRuntime
+@attribute [Authorize]
+
+<PageTitle>Νέα Πληρωμή</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <MudCard>
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h4">
+                    <MudIcon Icon="@Icons.Material.Filled.Payment" Class="mr-2" />
+                    Νέα Πληρωμή
+                </MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               Color="Color.Default"
+                               OnClick="@(() => Navigation.NavigateTo("/payments"))"
+                               Title="Κλείσιμο" />
+            </CardHeaderActions>
+        </MudCardHeader>
+
+        <MudCardContent>
+            <MudForm @ref="form" @bind-IsValid="@formIsValid" @bind-Errors="@errors">
+                <MudGrid>
+                    <!-- Member Selection -->
+                    <MudItem xs="12">
+                        <MudAutocomplete T="Member"
+                                         @bind-Value="selectedMember"
+                                         Label="Επιλογή Μέλους *"
+                                         Variant="Variant.Outlined"
+                                         Required="true"
+                                         RequiredError="Παρακαλώ επιλέξτε μέλος"
+                                         SearchFunc="@SearchMembers"
+                                         ToStringFunc="@(m => m?.FullName ?? "")"
+                                         ShowProgressIndicator="true"
+                                         Dense="false"
+                                         Margin="Margin.Dense"
+                                         AdornmentIcon="@Icons.Material.Filled.Person"
+                                         AdornmentColor="Color.Primary"
+                                         ResetValueOnEmptyText="true"
+                                         CoerceText="false"
+                                         CoerceValue="false">
+                            <ItemTemplate Context="member">
+                                <MudGrid AlignItems="Center">
+                                    <MudItem xs="8">
+                                        <MudText Typo="Typo.body1">@member.FullName</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @member.MemberNumber | @member.Phone
+                                        </MudText>
+                                    </MudItem>
+                                    <MudItem xs="4" Class="text-right">
+                                        <MudChip T="string" Color="@GetMemberStatusColor(member.Status)" Size="Size.Small">
+                                            @GetMemberStatusText(member.Status)
+                                        </MudChip>
+                                    </MudItem>
+                                </MudGrid>
+                            </ItemTemplate>
+                        </MudAutocomplete>
+                    </MudItem>
+
+                    <!-- Member Info Card (shown when member is selected) -->
+                    @if (selectedMember != null)
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Info" Dense="true">
+                                <MudGrid AlignItems="Center">
+                                    <MudItem xs="12" md="4">
+                                        <MudText Typo="Typo.subtitle2">Μέλος:</MudText>
+                                        <MudText Typo="Typo.body2">@selectedMember.FullName</MudText>
+                                    </MudItem>
+                                    <MudItem xs="12" md="4">
+                                        <MudText Typo="Typo.subtitle2">Τύπος Συνδρομής:</MudText>
+                                        <MudText Typo="Typo.body2">@selectedMember.MembershipType?.Name</MudText>
+                                    </MudItem>
+                                    <MudItem xs="12" md="4">
+                                        <MudText Typo="Typo.subtitle2">Μηνιαία Συνδρομή:</MudText>
+                                        <MudText Typo="Typo.body2">€@selectedMember.MembershipType?.MonthlyFee.ToString("F2")</MudText>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudAlert>
+                        </MudItem>
+
+                        <!-- Outstanding Subscriptions Info -->
+                        @if (outstandingSubscriptions.Any())
+                        {
+                            <MudItem xs="12">
+                                <MudAlert Severity="Severity.Warning" Dense="true">
+                                    <MudText Typo="Typo.subtitle2">Εκκρεμείς Συνδρομές:</MudText>
+                                    <MudText Typo="Typo.body2">
+                                        Το μέλος έχει @outstandingSubscriptions.Count εκκρεμείς συνδρομές συνολικού ποσού €@outstandingSubscriptions.Sum(s => s.Amount).ToString("F2")
+                                    </MudText>
+                                </MudAlert>
+                            </MudItem>
+                        }
+                    }
+
+                    <!-- Amount -->
+                    <MudItem xs="12" md="6">
+                        <MudNumericField @bind-Value="payment.Amount"
+                                         Label="Ποσό (€) *"
+                                         Variant="Variant.Outlined"
+                                         Required="true"
+                                         RequiredError="Το ποσό είναι υποχρεωτικό"
+                                         Min="0.01m"
+                                         Step="0.01m"
+                                         Format="F2"
+                                         Margin="Margin.Dense"
+                                         AdornmentIcon="@Icons.Material.Filled.Euro"
+                                         AdornmentColor="Color.Success" />
+                    </MudItem>
+
+                    <!-- Payment Method -->
+                    <MudItem xs="12" md="6">
+                        <MudSelect @bind-Value="payment.PaymentMethod"
+                                   Label="Μέθοδος Πληρωμής *"
+                                   Variant="Variant.Outlined"
+                                   Required="true"
+                                   RequiredError="Επιλέξτε μέθοδο πληρωμής"
+                                   Margin="Margin.Dense"
+                                   AdornmentIcon="@Icons.Material.Filled.CreditCard"
+                                   AdornmentColor="Color.Primary">
+                            <MudSelectItem Value="@PaymentMethod.Cash">
+                                <div class="d-flex align-center">
+                                    <MudIcon Icon="@Icons.Material.Filled.Money" Class="mr-2" />
+                                    Μετρητά
+                                </div>
+                            </MudSelectItem>
+                            <MudSelectItem Value="@PaymentMethod.Card">
+                                <div class="d-flex align-center">
+                                    <MudIcon Icon="@Icons.Material.Filled.CreditCard" Class="mr-2" />
+                                    Κάρτα
+                                </div>
+                            </MudSelectItem>
+                            <MudSelectItem Value="@PaymentMethod.BankTransfer">
+                                <div class="d-flex align-center">
+                                    <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Class="mr-2" />
+                                    Τραπεζικό Έμβασμα
+                                </div>
+                            </MudSelectItem>
+                            <MudSelectItem Value="@PaymentMethod.DigitalWallet">
+                                <div class="d-flex align-center">
+                                    <MudIcon Icon="@Icons.Material.Filled.Wallet" Class="mr-2" />
+                                    Ψηφιακό Πορτοφόλι
+                                </div>
+                            </MudSelectItem>
+                            <MudSelectItem Value="@PaymentMethod.Check">
+                                <div class="d-flex align-center">
+                                    <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
+                                    Επιταγή
+                                </div>
+                            </MudSelectItem>
+                            <MudSelectItem Value="@PaymentMethod.Other">
+                                <div class="d-flex align-center">
+                                    <MudIcon Icon="@Icons.Material.Filled.MoreHoriz" Class="mr-2" />
+                                    Άλλο
+                                </div>
+                            </MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <!-- Payment Date -->
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker @bind-Date="paymentDate"
+                                       Label="Ημερομηνία Πληρωμής *"
+                                       Variant="Variant.Outlined"
+                                       DateFormat="dd/MM/yyyy"
+                                       MaxDate="DateTime.Today"
+                                       Required="true"
+                                       RequiredError="Η ημερομηνία είναι υποχρεωτική"
+                                       Margin="Margin.Dense"
+                                       AdornmentIcon="@Icons.Material.Filled.CalendarToday"
+                                       AdornmentColor="Color.Primary" />
+                    </MudItem>
+
+                    <!-- Transaction Reference (for non-cash payments) -->
+                    @if (payment.PaymentMethod != PaymentMethod.Cash)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="payment.TransactionReference"
+                                          Label="Αριθμός Αναφοράς"
+                                          Variant="Variant.Outlined"
+                                          HelperText="Αριθμός συναλλαγής, επιταγής κλπ."
+                                          Margin="Margin.Dense"
+                                          AdornmentIcon="@Icons.Material.Filled.Tag"
+                                          AdornmentColor="Color.Secondary" />
+                        </MudItem>
+                    }
+
+                    <!-- Notes -->
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="payment.Notes"
+                                      Label="Σημειώσεις"
+                                      Variant="Variant.Outlined"
+                                      Lines="3"
+                                      Margin="Margin.Dense"
+                                      AdornmentIcon="@Icons.Material.Filled.Notes"
+                                      AdornmentColor="Color.Secondary" />
+                    </MudItem>
+
+                    <!-- Options -->
+                    <MudItem xs="12">
+                        <MudSwitch @bind-Value="sendEmailReceipt"
+                                   Label="Αποστολή απόδειξης με email"
+                                   Color="Color.Primary" />
+                        @if (sendEmailReceipt && selectedMember != null && string.IsNullOrEmpty(selectedMember.Email))
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                                <MudText Typo="Typo.caption">
+                                    Το μέλος δεν έχει email διεύθυνση. Η απόδειξη δεν θα σταλεί.
+                                </MudText>
+                            </MudAlert>
+                        }
+                    </MudItem>
+
+                    <!-- Validation Errors -->
+                    @if (errors?.Length > 0)
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Error" Dense="true">
+                                @foreach (var error in errors)
+                                {
+                                    <MudText Typo="Typo.body2">• @error</MudText>
+                                }
+                            </MudAlert>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudForm>
+        </MudCardContent>
+
+        <MudCardActions>
+            <MudButton OnClick="Cancel" Variant="Variant.Text">
+                <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-2" />
+                Ακύρωση
+            </MudButton>
+            <MudSpacer />
+            <MudButton Color="Color.Secondary"
+                       Variant="Variant.Filled"
+                       OnClick="SaveAndNew"
+                       Disabled="@(!formIsValid || processing)"
+                       Class="mr-2">
+                <MudIcon Icon="@Icons.Material.Filled.AddCircle" Class="mr-2" />
+                Αποθήκευση & Νέα
+            </MudButton>
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       OnClick="Submit"
+                       Disabled="@(!formIsValid || processing)">
+                @if (processing)
+                {
+                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    <MudText Class="ms-2">Αποθήκευση...</MudText>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-2" />
+                    <MudText>Αποθήκευση</MudText>
+                }
+            </MudButton>
+        </MudCardActions>
+    </MudCard>
+
+    <!-- Recent Payments Preview -->
+    @if (recentPayments.Any())
+    {
+        <MudCard Class="mt-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Πρόσφατες Πληρωμές</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                    <thead>
+                        <tr>
+                            <th>Απόδειξη</th>
+                            <th>Μέλος</th>
+                            <th>Ποσό</th>
+                            <th>Ημερομηνία</th>
+                            <th>Ενέργειες</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in recentPayments.Take(5))
+                        {
+                            <tr>
+                                <td>@p.ReceiptNumber</td>
+                                <td>@p.Member?.FullName</td>
+                                <td>€@p.Amount.ToString("F2")</td>
+                                <td>@p.PaymentDate.ToString("dd/MM/yyyy")</td>
+                                <td>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Print"
+                                                   Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => PrintReceipt(p.Id))"
+                                                   Title="Εκτύπωση Απόδειξης" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudCardContent>
+        </MudCard>
+    }
+</MudContainer>
+
+@code {
+    private MudForm form = null!;
+    private bool formIsValid;
+    private string[] errors = Array.Empty<string>();
+    private bool processing;
+    private bool sendEmailReceipt = true;
+
+    private Payment payment = new();
+    private Member? selectedMember;
+    private DateTime? paymentDate = DateTime.Today;
+    private List<Subscription> outstandingSubscriptions = new();
+    private List<Payment> recentPayments = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        payment = new Payment
+        {
+            PaymentMethod = PaymentMethod.Cash,
+            Status = PaymentStatus.Confirmed
+        };
+
+        await LoadRecentPayments();
+    }
+
+    private async Task LoadRecentPayments()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userIdClaim = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+            {
+                var payments = await PaymentService.GetCollectorPaymentsAsync(userId);
+                recentPayments = payments.OrderByDescending(p => p.CreatedAt).Take(5).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης πρόσφατων πληρωμών: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    private async Task<IEnumerable<Member>> SearchMembers(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length < 2)
+            return Array.Empty<Member>();
+
+        try
+        {
+            var members = await MemberService.SearchAsync(value);
+            return members.Take(10);
+        }
+        catch
+        {
+            return Array.Empty<Member>();
+        }
+    }
+
+    private async Task LoadMemberSubscriptions()
+    {
+        if (selectedMember == null) return;
+
+        try
+        {
+            var subscriptions = await SubscriptionService.GetMemberSubscriptionsAsync(selectedMember.Id);
+            outstandingSubscriptions = subscriptions
+                .Where(s => s.Status == SubscriptionStatus.Pending || s.Status == SubscriptionStatus.Overdue)
+                .OrderBy(s => s.Year)
+                .ThenBy(s => s.Month)
+                .ToList();
+
+            // Auto-calculate amount if subscriptions are selected
+            if (outstandingSubscriptions.Any())
+            {
+                payment.Amount = outstandingSubscriptions.Sum(s => s.Amount);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης συνδρομών: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Submit()
+    {
+        await SavePayment(false);
+    }
+
+    private async Task SaveAndNew()
+    {
+        await SavePayment(true);
+    }
+
+    private async Task SavePayment(bool createNew)
+    {
+        if (!formIsValid || selectedMember == null || !paymentDate.HasValue) return;
+
+        processing = true;
+        try
+        {
+            // Get current user as collector
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userIdClaim = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            int collectorId = 0;
+
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+            {
+                collectorId = userId;
+            }
+
+            // Set payment properties
+            payment.MemberId = selectedMember.Id;
+            payment.PaymentDate = paymentDate.Value;
+            payment.CollectorId = collectorId;
+            payment.CreatedAt = DateTime.UtcNow;
+
+            // Link to first outstanding subscription if any
+            var firstSub = outstandingSubscriptions.FirstOrDefault();
+            if (firstSub != null)
+            {
+                payment.SubscriptionId = firstSub.Id;
+            }
+
+            // Create payment
+            var createdPayment = await PaymentService.CreatePaymentAsync(payment);
+
+            // Send email receipt if requested
+            if (sendEmailReceipt && !string.IsNullOrEmpty(selectedMember.Email))
+            {
+                try
+                {
+                    await PaymentService.SendReceiptAsync(createdPayment.Id);
+                    Snackbar.Add("Απόδειξη στάλθηκε με email", Severity.Info);
+                }
+                catch
+                {
+                    Snackbar.Add("Η απόδειξη δημιουργήθηκε αλλά δεν στάλθηκε email", Severity.Warning);
+                }
+            }
+
+            Snackbar.Add($"Η πληρωμή {createdPayment.ReceiptNumber} καταχωρήθηκε επιτυχώς", Severity.Success);
+
+            if (createNew)
+            {
+                // Reset form for new payment
+                payment = new Payment
+                {
+                    PaymentMethod = PaymentMethod.Cash,
+                    Status = PaymentStatus.Confirmed
+                };
+                selectedMember = null;
+                paymentDate = DateTime.Today;
+                outstandingSubscriptions.Clear();
+                await LoadRecentPayments();
+                StateHasChanged();
+            }
+            else
+            {
+                Navigation.NavigateTo("/payments");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            processing = false;
+        }
+    }
+
+    private async Task PrintReceipt(int paymentId)
+    {
+        try
+        {
+            var pdfBytes = await PaymentService.GenerateReceiptPdfAsync(paymentId);
+            var base64 = Convert.ToBase64String(pdfBytes);
+            await JSRuntime.InvokeVoidAsync("open", $"data:application/pdf;base64,{base64}", "_blank");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα εκτύπωσης: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel() => Navigation.NavigateTo("/payments");
+
+    private static Color GetMemberStatusColor(MemberStatus status) => status switch
+    {
+        MemberStatus.Active => Color.Success,
+        MemberStatus.Inactive => Color.Warning,
+        MemberStatus.Suspended => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetMemberStatusText(MemberStatus status) => status switch
+    {
+        MemberStatus.Active => "Ενεργό",
+        MemberStatus.Inactive => "Ανενεργό",
+        MemberStatus.Suspended => "Αναστολή",
+        _ => status.ToString()
+    };
+
+    private static string GetSubscriptionStatusText(SubscriptionStatus status) => status switch
+    {
+        SubscriptionStatus.Pending => "Εκκρεμής",
+        SubscriptionStatus.Paid => "Εξοφλημένη",
+        SubscriptionStatus.Overdue => "Ληξιπρόθεσμη",
+        _ => status.ToString()
+    };
+}

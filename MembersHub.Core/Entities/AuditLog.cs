@@ -32,6 +32,8 @@ public enum AuditAction
     Logout = 2,
     LoginFailed = 3,
     PasswordReset = 4,
+    PasswordResetRequested = 5,
+    PasswordResetCompleted = 6,
     
     // CRUD Actions
     Create = 10,

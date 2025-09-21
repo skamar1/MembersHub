@@ -1,0 +1,136 @@
+@using MembersHub.Core.Interfaces
+@using MudBlazor
+@inject IEmailConfigurationService EmailConfigService
+@rendermode InteractiveServer
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Preview" Class="mr-3" />
+            Προεπισκόπηση Email Template
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center pa-4">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                <MudText Class="ml-3">Φόρτωση προεπισκόπησης...</MudText>
+            </div>
+        }
+        else
+        {
+            <MudStack Spacing="3">
+                <MudAlert Severity="Severity.Info" Variant="Variant.Text">
+                    <strong>Σημείωση:</strong> Αυτό είναι ένα παράδειγμα προεπισκόπησης. Τα πραγματικά email θα περιέχουν τα σωστά στοιχεία του χρήστη.
+                </MudAlert>
+                
+                <MudPaper Elevation="2" Class="pa-4" Style="max-height: 500px; overflow-y: auto;">
+                    <div>
+                        @if (!string.IsNullOrEmpty(previewContent))
+                        {
+                            @((MarkupString)previewContent)
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Error">Δεν ήταν δυνατή η φόρτωση του template</MudText>
+                        }
+                    </div>
+                </MudPaper>
+                
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <strong>Στοιχεία που θα αντικατασταθούν:</strong><br/>
+                    • {UserName} → Το πλήρες όνομα του χρήστη<br/>
+                    • {ResetLink} ή {ResetUrl} → Το πραγματικό link επαναφοράς<br/>
+                    • {ExpirationHours} → Ώρες λήξης του token (προκαθορισμένο: 1 ώρα)
+                </MudText>
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Close">Κλείσιμο</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string? CustomTemplate { get; set; }
+
+    private string previewContent = string.Empty;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPreview();
+    }
+
+    private async Task LoadPreview()
+    {
+        try
+        {
+            string templateContent;
+            
+            if (!string.IsNullOrEmpty(CustomTemplate))
+            {
+                templateContent = CustomTemplate;
+            }
+            else
+            {
+                // Load active email settings template
+                var emailSettings = await EmailConfigService.GetActiveEmailSettingsAsync();
+                templateContent = emailSettings?.PasswordResetTemplate ?? GetDefaultTemplate();
+            }
+
+            // Replace placeholders with sample data
+            previewContent = templateContent
+                .Replace("{UserName}", "Γιάννης Παπαδόπουλος")
+                .Replace("{ResetLink}", "https://localhost:7135/reset-password?token=sample-token-preview")
+                .Replace("{ResetUrl}", "https://localhost:7135/reset-password?token=sample-token-preview")
+                .Replace("{ExpirationHours}", "1");
+        }
+        catch (Exception ex)
+        {
+            previewContent = $"<div style='color: red;'>Σφάλμα κατά τη φόρτωση της προεπισκόπησης: {ex.Message}</div>";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string GetDefaultTemplate()
+    {
+        return @"<html>
+<body style='font-family: Arial, sans-serif;'>
+    <div style='max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;'>
+        <h2 style='color: #7C6FD8; text-align: center;'>Επαναφορά Κωδικού Πρόσβασης</h2>
+        
+        <p>Γεια σας {UserName},</p>
+        
+        <p>Λάβαμε αίτημα επαναφοράς του κωδικού πρόσβασής σας για τον λογαριασμό σας στο MembersHub.</p>
+        
+        <div style='text-align: center; margin: 30px 0;'>
+            <a href='{ResetUrl}' style='background-color: #7C6FD8; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;'>
+                Επαναφορά Κωδικού
+            </a>
+        </div>
+        
+        <p>Εναλλακτικά, μπορείτε να αντιγράψετε και να επικολλήσετε τον παρακάτω σύνδεσμο στον browser σας:</p>
+        <p style='word-break: break-all; color: #7C6FD8;'>{ResetUrl}</p>
+        
+        <p><strong>Σημαντικό:</strong> Αυτός ο σύνδεσμος θα λήξει σε {ExpirationHours} ώρα για λόγους ασφαλείας.</p>
+        
+        <p>Εάν δεν ζητήσατε αυτή την επαναφορά, μπορείτε να αγνοήσετε αυτό το email.</p>
+        
+        <hr style='border: none; border-top: 1px solid #ddd; margin: 30px 0;'>
+        
+        <p style='font-size: 12px; color: #666; text-align: center;'>
+            © 2025 MembersHub. Όλα τα δικαιώματα διατηρούνται.
+        </p>
+    </div>
+</body>
+</html>";
+    }
+
+    private void Close() => MudDialog.Close();
+}

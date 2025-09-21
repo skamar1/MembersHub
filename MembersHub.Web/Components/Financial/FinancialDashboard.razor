@@ -1,0 +1,404 @@
+@page "/financial/dashboard"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@inject IFinancialService FinancialService
+@inject ISnackbar Snackbar
+@attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
+
+<PageTitle>Financial Dashboard</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-6">💰 Financial Dashboard</MudText>
+
+    <!-- Period Selection -->
+    <MudPaper Class="pa-4 mb-6" Elevation="2">
+        <MudGrid AlignItems="Center">
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker Label="Από" @bind-Date="startDate" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker Label="Έως" @bind-Date="endDate" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadDashboardData" Class="mt-4">
+                    <MudIcon Icon="Icons.Material.Filled.Refresh" Class="mr-2" />
+                    Ανανέωση
+                </MudButton>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string" Label="Γρήγορη επιλογή" Value="@selectedPeriod" ValueChanged="OnPeriodChanged">
+                    <MudSelectItem Value="@("this_month")">Αυτός ο μήνας</MudSelectItem>
+                    <MudSelectItem Value="@("last_month")">Προηγούμενος μήνας</MudSelectItem>
+                    <MudSelectItem Value="@("this_year")">Φέτος</MudSelectItem>
+                    <MudSelectItem Value="@("last_year")">Πέρσι</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (loading)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </div>
+    }
+    else if (summary != null)
+    {
+        <!-- Financial Summary Cards -->
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="3">
+                    <MudCardContent Class="text-center">
+                        <MudIcon Icon="Icons.Material.Filled.TrendingUp" Size="Size.Large" Color="Color.Success" Class="mb-2" />
+                        <MudText Typo="Typo.h6" Color="Color.Success">Συνολικά Έσοδα</MudText>
+                        <MudText Typo="Typo.h4">€@summary.TotalIncome.ToString("N2")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Συνδρομές: €@summary.MembershipIncome.ToString("N2")
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="3">
+                    <MudCardContent Class="text-center">
+                        <MudIcon Icon="Icons.Material.Filled.TrendingDown" Size="Size.Large" Color="Color.Error" Class="mb-2" />
+                        <MudText Typo="Typo.h6" Color="Color.Error">Συνολικά Έξοδα</MudText>
+                        <MudText Typo="Typo.h4">€@summary.TotalExpenses.ToString("N2")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Λειτουργικά: €@summary.OperationalExpenses.ToString("N2")
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="3">
+                    <MudCardContent Class="text-center">
+                        <MudIcon Icon="Icons.Material.Filled.AccountBalance" Size="Size.Large"
+                                Color="@(summary.NetProfit >= 0 ? Color.Success : Color.Error)" Class="mb-2" />
+                        <MudText Typo="Typo.h6" Color="@(summary.NetProfit >= 0 ? Color.Success : Color.Error)">
+                            Καθαρό Κέρδος
+                        </MudText>
+                        <MudText Typo="Typo.h4">€@summary.NetProfit.ToString("N2")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Υπόλοιπο: €@summary.CurrentBalance.ToString("N2")
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="3">
+                    <MudCardContent Class="text-center">
+                        <MudIcon Icon="Icons.Material.Filled.Groups" Size="Size.Large" Color="Color.Info" Class="mb-2" />
+                        <MudText Typo="Typo.h6" Color="Color.Info">Μέλη</MudText>
+                        <MudText Typo="Typo.h4">@summary.PaidMembers/@summary.TotalMembers</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Εκκρεμείς: @summary.PendingPayments
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Charts Row -->
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" md="8">
+                <MudCard Elevation="3" Class="pa-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">📊 Μηνιαία Εξέλιξη</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (monthlyData.Any())
+                        {
+                            <div style="height: 400px;">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                                    Σύγκριση εσόδων και εξόδων ανά μήνα
+                                </MudText>
+                                <!-- Chart implementation would go here -->
+                                <div class="d-flex justify-center align-center" style="height: 350px; background: linear-gradient(45deg, #f5f5f5, #e0e0e0); border-radius: 8px;">
+                                    <MudText Typo="Typo.h6" Color="Color.Secondary">📈 Chart Component</MudText>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center pa-8">
+                                <MudText Typo="Typo.body1" Color="Color.Secondary">Δεν υπάρχουν δεδομένα για την περίοδο</MudText>
+                            </div>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudCard Elevation="3" Class="pa-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">💳 Τρόποι Πληρωμής</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (paymentMethodStats.Any())
+                        {
+                            @foreach (var method in paymentMethodStats)
+                            {
+                                <div class="d-flex justify-space-between align-center mb-3">
+                                    <div>
+                                        <MudText Typo="Typo.body1">@GetPaymentMethodName(method.PaymentMethod)</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@method.Count πληρωμές</MudText>
+                                    </div>
+                                    <MudText Typo="Typo.h6">€@method.Total.ToString("N2")</MudText>
+                                </div>
+                                <MudProgressLinear Value="@(GetPaymentMethodPercentage(method.Total))" Color="Color.Primary" Class="mb-3" />
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-center pa-4">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Δεν υπάρχουν πληρωμές</MudText>
+                            </div>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Outstanding Payments Section -->
+        <MudCard Elevation="3" Class="mb-6">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">⚠️ Εκκρεμείς Πληρωμές</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/financial/subscriptions">
+                        Προβολή Όλων
+                    </MudButton>
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4 text-center" Style="background: #fff3cd;">
+                            <MudIcon Icon="Icons.Material.Filled.Schedule" Color="Color.Warning" Size="Size.Large" />
+                            <MudText Typo="Typo.h6" Class="mt-2">@summary.PendingPayments</MudText>
+                            <MudText Typo="Typo.body2">Εκκρεμείς</MudText>
+                            <MudText Typo="Typo.caption">€@summary.PendingAmount.ToString("N2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4 text-center" Style="background: #f8d7da;">
+                            <MudIcon Icon="Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" />
+                            <MudText Typo="Typo.h6" Class="mt-2">@summary.OverduePayments</MudText>
+                            <MudText Typo="Typo.body2">Καθυστερημένες</MudText>
+                            <MudText Typo="Typo.caption">€@summary.OverdueAmount.ToString("N2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4 text-center" Style="background: #d1ecf1;">
+                            <MudIcon Icon="Icons.Material.Filled.Payments" Color="Color.Info" Size="Size.Large" />
+                            <MudText Typo="Typo.h6" Class="mt-2">@summary.TotalPayments</MudText>
+                            <MudText Typo="Typo.body2">Συνολικές Πληρωμές</MudText>
+                            <MudText Typo="Typo.caption">Αυτήν την περίοδο</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-4 text-center" Style="background: #d4edda;">
+                            <MudIcon Icon="Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Large" />
+                            <MudText Typo="Typo.h6" Class="mt-2">€@GetAveragePayment()</MudText>
+                            <MudText Typo="Typo.body2">Μέσος Όρος</MudText>
+                            <MudText Typo="Typo.caption">Πληρωμή</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Quick Actions -->
+        <MudCard Elevation="3">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">⚡ Γρήγορες Ενέργειες</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                                   Href="/financial/payments/new" Class="pa-4">
+                            <div class="text-center">
+                                <MudIcon Icon="Icons.Material.Filled.Add" Size="Size.Large" Class="mb-2" />
+                                <br />Νέα Πληρωμή
+                            </div>
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true"
+                                   Href="/financial/expenses/new" Class="pa-4">
+                            <div class="text-center">
+                                <MudIcon Icon="Icons.Material.Filled.Receipt" Size="Size.Large" Class="mb-2" />
+                                <br />Νέο Έξοδο
+                            </div>
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Tertiary" FullWidth="true"
+                                   Href="/financial/invoices/generate" Class="pa-4">
+                            <div class="text-center">
+                                <MudIcon Icon="Icons.Material.Filled.Description" Size="Size.Large" Class="mb-2" />
+                                <br />Δημιουργία Τιμολογίων
+                            </div>
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Info" FullWidth="true"
+                                   Href="/financial/reports" Class="pa-4">
+                            <div class="text-center">
+                                <MudIcon Icon="Icons.Material.Filled.Assessment" Size="Size.Large" Class="mb-2" />
+                                <br />Αναφορές
+                            </div>
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+    }
+</MudContainer>
+
+@code {
+    private bool loading = true;
+    private DateTime? startDate = DateTime.Now.AddMonths(-1);
+    private DateTime? endDate = DateTime.Now;
+    private string selectedPeriod = "this_month";
+    private FinancialSummary? summary;
+    private List<MonthlyFinancialData> monthlyData = new();
+    private List<(string PaymentMethod, int Count, decimal Total)> paymentMethodStats = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetCurrentMonth();
+        await LoadDashboardData();
+    }
+
+    private void SetCurrentMonth()
+    {
+        var now = DateTime.Now;
+        startDate = new DateTime(now.Year, now.Month, 1);
+        endDate = startDate.Value.AddMonths(1).AddDays(-1);
+    }
+
+    private async Task OnPeriodChanged(string period)
+    {
+        selectedPeriod = period;
+        var now = DateTime.Now;
+
+        switch (period)
+        {
+            case "this_month":
+                startDate = new DateTime(now.Year, now.Month, 1);
+                endDate = startDate.Value.AddMonths(1).AddDays(-1);
+                break;
+            case "last_month":
+                startDate = new DateTime(now.Year, now.Month, 1).AddMonths(-1);
+                endDate = startDate.Value.AddMonths(1).AddDays(-1);
+                break;
+            case "this_year":
+                startDate = new DateTime(now.Year, 1, 1);
+                endDate = new DateTime(now.Year, 12, 31);
+                break;
+            case "last_year":
+                startDate = new DateTime(now.Year - 1, 1, 1);
+                endDate = new DateTime(now.Year - 1, 12, 31);
+                break;
+        }
+
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        if (startDate == null || endDate == null) return;
+
+        loading = true;
+        try
+        {
+            // Load financial summary
+            summary = await FinancialService.GetFinancialSummaryAsync(startDate.Value, endDate.Value);
+
+            // Load monthly data for charts
+            monthlyData = await FinancialService.GetMonthlyDataAsync(startDate.Value.Year);
+
+            // Load payment method statistics
+            paymentMethodStats = await FinancialService.GetPaymentMethodStatsAsync(startDate.Value, endDate.Value);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα κατά τη φόρτωση δεδομένων: {ex.Message}", Severity.Error);
+
+            // Create mock data for demonstration
+            summary = new FinancialSummary
+            {
+                PeriodStart = startDate.Value,
+                PeriodEnd = endDate.Value,
+                TotalIncome = 2500m,
+                MembershipIncome = 2200m,
+                TotalExpenses = 1800m,
+                OperationalExpenses = 1500m,
+                NetProfit = 700m,
+                CurrentBalance = 15000m,
+                TotalMembers = 85,
+                PaidMembers = 72,
+                PendingPayments = 13,
+                OverduePayments = 3,
+                PendingAmount = 390m,
+                OverdueAmount = 90m,
+                TotalPayments = 45,
+                GeneratedAt = DateTime.Now
+            };
+
+            paymentMethodStats = new List<(string, int, decimal)>
+            {
+                ("Cash", 25, 1200m),
+                ("Card", 15, 900m),
+                ("BankTransfer", 5, 400m)
+            };
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private string GetPaymentMethodName(string method)
+    {
+        return method switch
+        {
+            "Cash" => "Μετρητά",
+            "Card" => "Κάρτα",
+            "BankTransfer" => "Έμβασμα",
+            "DigitalWallet" => "Ψηφιακό Πορτοφόλι",
+            "Check" => "Επιταγή",
+            _ => method
+        };
+    }
+
+    private double GetPaymentMethodPercentage(decimal amount)
+    {
+        var total = paymentMethodStats.Sum(x => x.Total);
+        return total > 0 ? (double)(amount / total * 100) : 0;
+    }
+
+    private string GetAveragePayment()
+    {
+        if (summary?.TotalPayments > 0 && summary.TotalIncome > 0)
+        {
+            var average = summary.TotalIncome / summary.TotalPayments;
+            return average.ToString("N2");
+        }
+        return "0.00";
+    }
+}

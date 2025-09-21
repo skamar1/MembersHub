@@ -1,0 +1,533 @@
+@page "/financial/subscriptions"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@using MembersHub.Web.Components.Financial
+@using MembersHub.Web.Models
+@inject MembersHubContext Context
+@inject IFinancialService FinancialService
+@inject ISubscriptionService SubscriptionService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IEmailNotificationService EmailService
+@attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
+
+<PageTitle>Subscription Management</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <div class="d-flex justify-space-between align-center mb-6">
+        <MudText Typo="Typo.h4">📅 Διαχείριση Συνδρομών</MudText>
+        <MudButtonGroup Variant="Variant.Filled">
+            <MudButton Color="Color.Primary" OnClick="ShowGenerateSubscriptionsDialog">
+                <MudIcon Icon="Icons.Material.Filled.Add" Class="mr-2" />
+                Δημιουργία Συνδρομών Μήνα
+            </MudButton>
+            <MudButton Color="Color.Secondary" OnClick="SendPaymentReminders">
+                <MudIcon Icon="Icons.Material.Filled.Email" Class="mr-2" />
+                Αποστολή Υπενθυμίσεων
+            </MudButton>
+        </MudButtonGroup>
+    </div>
+
+    <!-- Filters -->
+    <MudPaper Class="pa-4 mb-6" Elevation="2">
+        <MudGrid AlignItems="Center">
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="int" Label="Έτος" @bind-Value="selectedYear">
+                    @for (int year = DateTime.Now.Year - 2; year <= DateTime.Now.Year + 1; year++)
+                    {
+                        <MudSelectItem Value="@year">@year</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="int?" Label="Μήνας" @bind-Value="selectedMonth" Clearable="true">
+                    <MudSelectItem Value="@((int?)1)">Ιανουάριος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)2)">Φεβρουάριος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)3)">Μάρτιος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)4)">Απρίλιος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)5)">Μάιος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)6)">Ιούνιος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)7)">Ιούλιος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)8)">Αύγουστος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)9)">Σεπτέμβριος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)10)">Οκτώβριος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)11)">Νοέμβριος</MudSelectItem>
+                    <MudSelectItem Value="@((int?)12)">Δεκέμβριος</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="SubscriptionStatus?" Label="Κατάσταση" @bind-Value="selectedStatus" Clearable="true">
+                    <MudSelectItem Value="@((SubscriptionStatus?)SubscriptionStatus.Pending)">Εκκρεμής</MudSelectItem>
+                    <MudSelectItem Value="@((SubscriptionStatus?)SubscriptionStatus.Paid)">Πληρωμένη</MudSelectItem>
+                    <MudSelectItem Value="@((SubscriptionStatus?)SubscriptionStatus.Overdue)">Καθυστερημένη</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudTextField @bind-Value="memberSearch" Label="Αναζήτηση Μέλους"
+                              Adornment="Adornment.End" AdornmentIcon="Icons.Material.Filled.Search" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadSubscriptions" Class="mt-4">
+                    <MudIcon Icon="Icons.Material.Filled.Search" Class="mr-2" />
+                    Αναζήτηση
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- Summary Statistics -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Style="background: linear-gradient(45deg, #f8f9fa, #e9ecef);">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.CalendarMonth" Color="Color.Primary" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@subscriptions.Count</MudText>
+                    <MudText Typo="Typo.body2">Συνολικές Συνδρομές</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Style="background: linear-gradient(45deg, #d4edda, #c3e6cb);">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@subscriptions.Count(s => s.Status == SubscriptionStatus.Paid)</MudText>
+                    <MudText Typo="Typo.body2">Πληρωμένες</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Style="background: linear-gradient(45deg, #fff3cd, #ffeaa7);">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.Schedule" Color="Color.Warning" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@subscriptions.Count(s => s.Status == SubscriptionStatus.Pending)</MudText>
+                    <MudText Typo="Typo.body2">Εκκρεμείς</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Style="background: linear-gradient(45deg, #f8d7da, #f5c6cb);">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@subscriptions.Count(s => s.Status == SubscriptionStatus.Overdue)</MudText>
+                    <MudText Typo="Typo.body2">Καθυστερημένες</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Revenue Summary -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="6">
+            <MudCard Elevation="3">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-4">💰 Οικονομικά Στοιχεία</MudText>
+                    <MudText Typo="Typo.body1">
+                        <strong>Συνολικό Ποσό:</strong> €@subscriptions.Sum(s => s.Amount).ToString("N2")
+                    </MudText>
+                    <MudText Typo="Typo.body1" Class="mt-2">
+                        <strong>Πληρωμένο Ποσό:</strong> €@subscriptions.Where(s => s.Status == SubscriptionStatus.Paid).Sum(s => s.Amount).ToString("N2")
+                    </MudText>
+                    <MudText Typo="Typo.body1" Class="mt-2">
+                        <strong>Εκκρεμές Ποσό:</strong> €@subscriptions.Where(s => s.Status != SubscriptionStatus.Paid).Sum(s => s.Amount).ToString("N2")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6">
+            <MudCard Elevation="3">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-4">📊 Ποσοστά</MudText>
+                    <div class="mb-3">
+                        <MudText Typo="Typo.body2">Πληρωμένες: @GetPaymentPercentage()%</MudText>
+                        <MudProgressLinear Value="@GetPaymentPercentage()" Color="Color.Success" />
+                    </div>
+                    <div class="mb-3">
+                        <MudText Typo="Typo.body2">Εκκρεμείς: @GetPendingPercentage()%</MudText>
+                        <MudProgressLinear Value="@GetPendingPercentage()" Color="Color.Warning" />
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.body2">Καθυστερημένες: @GetOverduePercentage()%</MudText>
+                        <MudProgressLinear Value="@GetOverduePercentage()" Color="Color.Error" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Subscriptions Table -->
+    <MudCard Elevation="3">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Συνδρομές</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudChipSet T="string">
+                    <MudChip T="string" Text="Όλες" Color="@(selectedStatus == null ? Color.Primary : Color.Default)"
+                             OnClick="() => FilterByStatus(null)" />
+                    <MudChip T="string" Text="Εκκρεμείς" Color="@(selectedStatus == SubscriptionStatus.Pending ? Color.Warning : Color.Default)"
+                             OnClick="() => FilterByStatus(SubscriptionStatus.Pending)" />
+                    <MudChip T="string" Text="Καθυστερημένες" Color="@(selectedStatus == SubscriptionStatus.Overdue ? Color.Error : Color.Default)"
+                             OnClick="() => FilterByStatus(SubscriptionStatus.Overdue)" />
+                </MudChipSet>
+            </CardHeaderActions>
+        </MudCardHeader>
+        <MudCardContent Class="pa-0">
+            <MudDataGrid T="Subscription" Items="@filteredSubscriptions" Filterable="false" SortMode="@SortMode.Multiple"
+                         Loading="@loading" LoadingProgressColor="Color.Info" Hover="true"
+                         RowsPerPage="15" Elevation="0">
+                <Columns>
+                    <PropertyColumn Property="x => x.Id" Title="ID" />
+                    <TemplateColumn Title="Μέλος">
+                        <CellTemplate>
+                            <div class="d-flex align-center">
+                                <MudAvatar Size="Size.Small" Color="Color.Primary" Class="mr-3">
+                                    @context.Item.Member.FirstName.Substring(0, 1)@context.Item.Member.LastName.Substring(0, 1)
+                                </MudAvatar>
+                                <div>
+                                    <MudText Typo="Typo.body2">@context.Item.Member.FirstName @context.Item.Member.LastName</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.Member.MemberNumber</MudText>
+                                </div>
+                            </div>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.Year" Title="Έτος" />
+                    <PropertyColumn Property="x => x.Month" Title="Μήνας">
+                        <CellTemplate>
+                            @GetMonthName(context.Item.Month)
+                        </CellTemplate>
+                    </PropertyColumn>
+                    <PropertyColumn Property="x => x.Amount" Title="Ποσό" Format="C2">
+                        <CellTemplate>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">€@context.Item.Amount.ToString("N2")</MudText>
+                        </CellTemplate>
+                    </PropertyColumn>
+                    <PropertyColumn Property="x => x.DueDate" Title="Καταληκτική" Format="dd/MM/yyyy">
+                        <CellTemplate>
+                            <div class="d-flex align-center">
+                                @if (context.Item.DueDate < DateTime.Now && context.Item.Status != SubscriptionStatus.Paid)
+                                {
+                                    <MudIcon Icon="Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Small" Class="mr-1" />
+                                }
+                                <MudText Typo="Typo.body2">@context.Item.DueDate.ToString("dd/MM/yyyy")</MudText>
+                            </div>
+                        </CellTemplate>
+                    </PropertyColumn>
+                    <PropertyColumn Property="x => x.Status" Title="Κατάσταση">
+                        <CellTemplate>
+                            <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)"
+                                     Icon="@GetStatusIcon(context.Item.Status)">
+                                @GetStatusText(context.Item.Status)
+                            </MudChip>
+                        </CellTemplate>
+                    </PropertyColumn>
+                    <TemplateColumn Title="Πληρωμές">
+                        <CellTemplate>
+                            @if (context.Item.Payments.Any())
+                            {
+                                <MudTooltip Text="@string.Join(", ", context.Item.Payments.Select(p => $"€{p.Amount:N2} ({p.PaymentDate:dd/MM})"))">
+                                    <MudChip Size="Size.Small" Color="Color.Success">
+                                        @context.Item.Payments.Count πληρωμές
+                                    </MudChip>
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Καμία πληρωμή</MudText>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Ενέργειες" CellClass="d-flex justify-end">
+                        <CellTemplate>
+                            <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                                @if (context.Item.Status == SubscriptionStatus.Pending)
+                                {
+                                    <MudIconButton Icon="Icons.Material.Filled.Payment" Color="Color.Success"
+                                                   OnClick="() => MarkAsPaid(context.Item)"
+                                                   Title="Σήμανση ως Πληρωμένη" />
+                                }
+                                <MudIconButton Icon="Icons.Material.Filled.Email" Color="Color.Info"
+                                               OnClick="() => SendReminder(context.Item)"
+                                               Title="Αποστολή Υπενθύμισης" />
+                                <MudIconButton Icon="Icons.Material.Filled.Edit" Color="Color.Primary"
+                                               OnClick="() => EditSubscription(context.Item)"
+                                               Title="Επεξεργασία" />
+                            </MudButtonGroup>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+                <PagerContent>
+                    <MudDataGridPager T="Subscription" />
+                </PagerContent>
+            </MudDataGrid>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private bool loading = true;
+    private int selectedYear = DateTime.Now.Year;
+    private int? selectedMonth = DateTime.Now.Month;
+    private SubscriptionStatus? selectedStatus;
+    private string memberSearch = "";
+
+    private List<Subscription> subscriptions = new();
+    private IEnumerable<Subscription> filteredSubscriptions =>
+        subscriptions.Where(s => string.IsNullOrWhiteSpace(memberSearch) ||
+                                s.Member.FirstName.Contains(memberSearch, StringComparison.OrdinalIgnoreCase) ||
+                                s.Member.LastName.Contains(memberSearch, StringComparison.OrdinalIgnoreCase) ||
+                                s.Member.MemberNumber.Contains(memberSearch, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSubscriptions();
+    }
+
+    private async Task LoadSubscriptions()
+    {
+        loading = true;
+        try
+        {
+            var query = Context.Subscriptions
+                .Include(s => s.Member)
+                .Include(s => s.Payments)
+                .Where(s => s.Year == selectedYear);
+
+            if (selectedMonth.HasValue)
+                query = query.Where(s => s.Month == selectedMonth.Value);
+
+            if (selectedStatus.HasValue)
+                query = query.Where(s => s.Status == selectedStatus.Value);
+
+            subscriptions = await query
+                .OrderBy(s => s.Month)
+                .ThenBy(s => s.Member.LastName)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα κατά τη φόρτωση συνδρομών: {ex.Message}", Severity.Error);
+            subscriptions = new List<Subscription>();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task FilterByStatus(SubscriptionStatus? status)
+    {
+        selectedStatus = status;
+        await LoadSubscriptions();
+    }
+
+    private async Task ShowGenerateSubscriptionsDialog()
+    {
+        var currentDate = DateTime.Now;
+        var dialogParameters = new DialogParameters
+        {
+            { "Year", currentDate.Year },
+            { "Month", currentDate.Month }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<GenerateSubscriptionsDialog>(
+            "Δημιουργία Συνδρομών",
+            dialogParameters,
+            options);
+
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled && result.Data is GenerateSubscriptionsResult generateResult)
+        {
+            await GenerateSubscriptions(generateResult.Year, generateResult.Month);
+        }
+    }
+
+    private async Task GenerateSubscriptions(int year, int month)
+    {
+        try
+        {
+            var count = await SubscriptionService.GenerateMonthlySubscriptionsAsync(year, month);
+            Snackbar.Add($"Δημιουργήθηκαν {count} συνδρομές για {GetMonthName(month)} {year}!", Severity.Success);
+            await LoadSubscriptions();
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already exist"))
+        {
+            Snackbar.Add($"Οι συνδρομές για {GetMonthName(month)} {year} υπάρχουν ήδη!", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα κατά τη δημιουργία συνδρομών: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SendPaymentReminders()
+    {
+        var overdueCount = subscriptions.Count(s => s.Status == SubscriptionStatus.Overdue);
+        var pendingCount = subscriptions.Count(s => s.Status == SubscriptionStatus.Pending);
+
+        var result = await DialogService.ShowMessageBox(
+            "Αποστολή Υπενθυμίσεων",
+            $"Θα σταλούν υπενθυμίσεις σε {pendingCount} μέλη με εκκρεμείς συνδρομές και {overdueCount} με καθυστερημένες. Συνέχεια;",
+            yesText: "Αποστολή", cancelText: "Ακύρωση");
+
+        if (result == true)
+        {
+            Snackbar.Add($"Στάλθηκαν υπενθυμίσεις σε {pendingCount + overdueCount} μέλη!", Severity.Success);
+        }
+    }
+
+    private async Task MarkAsPaid(Subscription subscription)
+    {
+        try
+        {
+            subscription.Status = SubscriptionStatus.Paid;
+            Context.Subscriptions.Update(subscription);
+            await Context.SaveChangesAsync();
+
+            Snackbar.Add("Η συνδρομή σημάνθηκε ως πληρωμένη!", Severity.Success);
+            await LoadSubscriptions();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SendReminder(Subscription subscription)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(subscription.Member.Email))
+            {
+                Snackbar.Add($"Δεν υπάρχει email για τον/την {subscription.Member.FirstName} {subscription.Member.LastName}", Severity.Warning);
+                return;
+            }
+
+            var subject = $"Υπενθύμιση Συνδρομής - {GetMonthName(subscription.Month)} {subscription.Year}";
+            var body = $@"
+                <h3>Αγαπητέ/ή {subscription.Member.FirstName} {subscription.Member.LastName},</h3>
+                <p>Σας υπενθυμίζουμε ότι η συνδρομή σας για τον μήνα <strong>{GetMonthName(subscription.Month)} {subscription.Year}</strong>
+                παραμένει ανεξόφλητη.</p>
+
+                <p><strong>Στοιχεία Συνδρομής:</strong></p>
+                <ul>
+                    <li>Ποσό: €{subscription.Amount:N2}</li>
+                    <li>Καταληκτική Ημερομηνία: {subscription.DueDate:dd/MM/yyyy}</li>
+                    <li>Κατάσταση: {GetStatusText(subscription.Status)}</li>
+                </ul>
+
+                <p>Παρακαλούμε προβείτε στην εξόφληση το συντομότερο δυνατό.</p>
+
+                <p>Με εκτίμηση,<br>Η Διοίκηση</p>
+            ";
+
+            var (success, message) = await EmailService.SendEmailAsync(subscription.Member.Email, subject, body);
+
+            if (success)
+            {
+                Snackbar.Add($"Στάλθηκε υπενθύμιση στον/στην {subscription.Member.FirstName} {subscription.Member.LastName}!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"Αποτυχία αποστολής email: {message}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα κατά την αποστολή υπενθύμισης: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task EditSubscription(Subscription subscription)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Subscription", subscription }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<SubscriptionEditDialog>(
+            "Επεξεργασία Συνδρομής",
+            parameters,
+            options);
+
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await LoadSubscriptions();
+        }
+    }
+
+    private string GetMonthName(int month)
+    {
+        var monthNames = new[] { "", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος",
+                                "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος" };
+        return month >= 1 && month <= 12 ? monthNames[month] : month.ToString();
+    }
+
+    private Color GetStatusColor(SubscriptionStatus status)
+    {
+        return status switch
+        {
+            SubscriptionStatus.Paid => Color.Success,
+            SubscriptionStatus.Pending => Color.Warning,
+            SubscriptionStatus.Overdue => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private string GetStatusIcon(SubscriptionStatus status)
+    {
+        return status switch
+        {
+            SubscriptionStatus.Paid => Icons.Material.Filled.CheckCircle,
+            SubscriptionStatus.Pending => Icons.Material.Filled.Schedule,
+            SubscriptionStatus.Overdue => Icons.Material.Filled.Warning,
+            _ => Icons.Material.Filled.Help
+        };
+    }
+
+    private string GetStatusText(SubscriptionStatus status)
+    {
+        return status switch
+        {
+            SubscriptionStatus.Paid => "Πληρωμένη",
+            SubscriptionStatus.Pending => "Εκκρεμής",
+            SubscriptionStatus.Overdue => "Καθυστερημένη",
+            _ => status.ToString()
+        };
+    }
+
+    private double GetPaymentPercentage()
+    {
+        if (!subscriptions.Any()) return 0;
+        return Math.Round((double)subscriptions.Count(s => s.Status == SubscriptionStatus.Paid) / subscriptions.Count * 100, 1);
+    }
+
+    private double GetPendingPercentage()
+    {
+        if (!subscriptions.Any()) return 0;
+        return Math.Round((double)subscriptions.Count(s => s.Status == SubscriptionStatus.Pending) / subscriptions.Count * 100, 1);
+    }
+
+    private double GetOverduePercentage()
+    {
+        if (!subscriptions.Any()) return 0;
+        return Math.Round((double)subscriptions.Count(s => s.Status == SubscriptionStatus.Overdue) / subscriptions.Count * 100, 1);
+    }
+}

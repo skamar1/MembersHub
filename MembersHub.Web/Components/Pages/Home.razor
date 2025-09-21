@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using MudBlazor
+@using MembersHub.Web.Components.Shared
 @attribute [Authorize]
 
 <PageTitle>Αρχική - MembersHub</PageTitle>
@@ -14,9 +15,13 @@
                     <MudText Typo="Typo.h3" Color="Color.Primary" Align="Align.Center">
                         Καλώς ήρθατε στο MembersHub
                     </MudText>
-                    <MudText Typo="Typo.h6" Align="Align.Center" Class="mt-2">
+                    <MudText Typo="Typo.h6" Align="Align.Center" Class="mt-2 mb-6">
                         Γεια σου, @context.User.FindFirst("FullName")?.Value!
                     </MudText>
+                </MudItem>
+                
+                <MudItem xs="12" Class="mb-4">
+                    <DashboardStats />
                 </MudItem>
                 
                 <MudItem xs="12" sm="6" md="4">
@@ -80,6 +85,33 @@
                                 </MudButton>
                             </MudCardActions>
                         </MudCard>
+                    </MudItem>
+                </AuthorizeView>
+                
+                <AuthorizeView Roles="Admin,Owner" Context="emailContext">
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Large" Color="Color.Info" />
+                                <MudText Typo="Typo.h6">Ρυθμίσεις Email</MudText>
+                                <MudText Typo="Typo.body2">Διαμόρφωση SMTP και email templates</MudText>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudButton Variant="Variant.Text" Color="Color.Info" Href="/email-settings">
+                                    Διαμόρφωση
+                                </MudButton>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                </AuthorizeView>
+                
+                <AuthorizeView Roles="Admin,Owner" Context="adminInsightsContext">
+                    <MudItem xs="12" Class="mt-6">
+                        <MudText Typo="Typo.h5" Color="Color.Primary" Class="mb-4">
+                            <MudIcon Icon="@Icons.Material.Filled.Analytics" Class="mr-2" />
+                            Διαχειριστικά Στοιχεία
+                        </MudText>
+                        <AdminInsights />
                     </MudItem>
                 </AuthorizeView>
             </MudGrid>

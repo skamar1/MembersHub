@@ -172,6 +172,7 @@
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.AppHost/obj/Debug/net9.0/Aspire/references/MembersHub_ApiService.ProjectMetadata.g.cs
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.AppHost/obj/Debug/net9.0/Aspire/references/MembersHub_Worker.ProjectMetadata.g.cs
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.AppHost/obj/Debug/net9.0/Aspire/references/_AppHost.ProjectMetadata.g.cs
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.AppHost/obj/Debug/net9.0/MembersHub.AppHost.sourcelink.json
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.AppHost/obj/Debug/net9.0/MembersH.04E4C835.Up2Date
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.AppHost/obj/Debug/net9.0/MembersHub.AppHost.dll
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.AppHost/obj/Debug/net9.0/refint/MembersHub.AppHost.dll

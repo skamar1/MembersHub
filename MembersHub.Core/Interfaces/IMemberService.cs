@@ -16,4 +16,13 @@ public interface IMemberService
     Task DeleteAsync(int id);
     Task<decimal> GetOutstandingBalanceAsync(int memberId);
     Task<bool> ExistsAsync(string memberNumber);
+
+    // Additional business methods
+    Task<IEnumerable<Member>> GetMembersByStatusAsync(MemberStatus status);
+    Task<IEnumerable<Member>> GetMembersWithOverduePaymentsAsync();
+    Task<int> GetTotalMembersCountAsync();
+    Task<decimal> GetTotalMonthlyRevenueAsync();
+    Task ActivateMemberAsync(int memberId);
+    Task DeactivateMemberAsync(int memberId);
+    Task SuspendMemberAsync(int memberId, string reason);
 }

@@ -13,6 +13,7 @@
 @inject IAuditService AuditService
 @inject ISessionService SessionService
 @inject IHttpContextInfoService HttpContextInfo
+@inject NavigationManager Navigation
 @attribute [Authorize]
 
 <PageTitle>Διαχείριση Μελών - MembersHub</PageTitle>
@@ -325,8 +326,8 @@
     
     private void ViewPayments(Member member)
     {
-        // TODO: Navigate to payments view
-        Snackbar.Add($"Προβολή πληρωμών για: {member.FullName}", Severity.Info);
+        // Navigate to payments view filtered by member
+        Navigation.NavigateTo($"/financial/payments?memberId={member.Id}");
     }
     
     private async Task DeleteMember(Member member)

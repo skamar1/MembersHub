@@ -1,0 +1,278 @@
+@page "/financial/payments"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@inject MembersHubContext Context
+@inject IFinancialService FinancialService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
+
+<PageTitle>Payment Management</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <div class="d-flex justify-space-between align-center mb-6">
+        <MudText Typo="Typo.h4">💳 Διαχείριση Πληρωμών</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenNewPaymentDialog">
+            <MudIcon Icon="Icons.Material.Filled.Add" Class="mr-2" />
+            Νέα Πληρωμή
+        </MudButton>
+    </div>
+
+    <!-- Filters -->
+    <MudPaper Class="pa-4 mb-6" Elevation="2">
+        <MudGrid AlignItems="Center">
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker Label="Από" @bind-Date="filterStartDate" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker Label="Έως" @bind-Date="filterEndDate" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="PaymentMethod?" Label="Τρόπος Πληρωμής" @bind-Value="filterPaymentMethod" Clearable="true">
+                    <MudSelectItem Value="@((PaymentMethod?)PaymentMethod.Cash)">Μετρητά</MudSelectItem>
+                    <MudSelectItem Value="@((PaymentMethod?)PaymentMethod.Card)">Κάρτα</MudSelectItem>
+                    <MudSelectItem Value="@((PaymentMethod?)PaymentMethod.BankTransfer)">Έμβασμα</MudSelectItem>
+                    <MudSelectItem Value="@((PaymentMethod?)PaymentMethod.DigitalWallet)">Ψηφιακό Πορτοφόλι</MudSelectItem>
+                    <MudSelectItem Value="@((PaymentMethod?)PaymentMethod.Check)">Επιταγή</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadPayments" Class="mt-4">
+                    <MudIcon Icon="Icons.Material.Filled.Search" Class="mr-2" />
+                    Αναζήτηση
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- Summary Cards -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.Payments" Color="Color.Primary" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@payments.Count</MudText>
+                    <MudText Typo="Typo.body2">Συνολικές Πληρωμές</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.Euro" Color="Color.Success" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">€@payments.Sum(p => p.Amount).ToString("N2")</MudText>
+                    <MudText Typo="Typo.body2">Συνολικό Ποσό</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.MonetizationOn" Color="Color.Info" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">€@(payments.Any() ? (payments.Sum(p => p.Amount) / payments.Count).ToString("N2") : "0.00")</MudText>
+                    <MudText Typo="Typo.body2">Μέσος Όρος</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.Today" Color="Color.Secondary" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@payments.Count(p => p.PaymentDate.Date == DateTime.Today)</MudText>
+                    <MudText Typo="Typo.body2">Σήμερα</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Payments Table -->
+    <MudCard Elevation="3">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Πληρωμές</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudTextField @bind-Value="searchString" Placeholder="Αναζήτηση..."
+                              Adornment="Adornment.Start" AdornmentIcon="Icons.Material.Filled.Search"
+                              IconSize="Size.Medium" Class="mt-0" Immediate="true" DebounceInterval="300"
+                              OnDebounceIntervalElapsed="OnSearchChanged" />
+            </CardHeaderActions>
+        </MudCardHeader>
+        <MudCardContent Class="pa-0">
+            <MudDataGrid T="Payment" Items="@filteredPayments" Filterable="false" SortMode="@SortMode.Multiple"
+                         Loading="@loading" LoadingProgressColor="Color.Info" Hover="true"
+                         RowsPerPage="10" Elevation="0">
+                <Columns>
+                    <PropertyColumn Property="x => x.Id" Title="ID" />
+                    <PropertyColumn Property="x => x.Member.FirstName + &quot; &quot; + x.Member.LastName" Title="Μέλος" />
+                    <PropertyColumn Property="x => x.Amount" Title="Ποσό" Format="C2" />
+                    <PropertyColumn Property="x => x.PaymentDate" Title="Ημερομηνία" Format="dd/MM/yyyy" />
+                    <PropertyColumn Property="x => x.PaymentMethod" Title="Τρόπος Πληρωμής">
+                        <CellTemplate>
+                            <MudChip Size="Size.Small" Color="@GetPaymentMethodColor(context.Item.PaymentMethod)">
+                                @GetPaymentMethodText(context.Item.PaymentMethod)
+                            </MudChip>
+                        </CellTemplate>
+                    </PropertyColumn>
+                    <PropertyColumn Property="x => x.Status" Title="Κατάσταση">
+                        <CellTemplate>
+                            <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)">
+                                @GetStatusText(context.Item.Status)
+                            </MudChip>
+                        </CellTemplate>
+                    </PropertyColumn>
+                    <PropertyColumn Property="x => x.ReceiptNumber" Title="Αρ. Απόδειξης" />
+                    <PropertyColumn Property="x => x.Collector.FirstName + &quot; &quot; + x.Collector.LastName" Title="Εισπράκτορας" />
+                    <TemplateColumn Title="Ενέργειες" CellClass="d-flex justify-end">
+                        <CellTemplate>
+                            <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                                <MudIconButton Icon="Icons.Material.Filled.Visibility" Color="Color.Info"
+                                               OnClick="() => ViewPayment(context.Item)" />
+                                <MudIconButton Icon="Icons.Material.Filled.Edit" Color="Color.Primary"
+                                               OnClick="() => EditPayment(context.Item)" />
+                                <MudIconButton Icon="Icons.Material.Filled.Receipt" Color="Color.Secondary"
+                                               OnClick="() => PrintReceipt(context.Item)" />
+                            </MudButtonGroup>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+                <PagerContent>
+                    <MudDataGridPager T="Payment" />
+                </PagerContent>
+            </MudDataGrid>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private bool loading = true;
+    private string searchString = "";
+    private DateTime? filterStartDate = DateTime.Now.AddMonths(-1);
+    private DateTime? filterEndDate = DateTime.Now;
+    private PaymentMethod? filterPaymentMethod;
+
+    private List<Payment> payments = new();
+    private IEnumerable<Payment> filteredPayments =>
+        payments.Where(p => string.IsNullOrWhiteSpace(searchString) ||
+                           p.Member.FirstName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                           p.Member.LastName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                           p.ReceiptNumber.Contains(searchString, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPayments();
+    }
+
+    private async Task LoadPayments()
+    {
+        loading = true;
+        try
+        {
+            var startDate = filterStartDate ?? DateTime.Now.AddYears(-1);
+            var endDate = filterEndDate ?? DateTime.Now;
+
+            payments = await Context.Payments
+                .Include(p => p.Member)
+                .Include(p => p.Collector)
+                .Include(p => p.Subscription)
+                .Where(p => p.PaymentDate >= startDate && p.PaymentDate <= endDate)
+                .Where(p => filterPaymentMethod == null || p.PaymentMethod == filterPaymentMethod)
+                .OrderByDescending(p => p.PaymentDate)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα κατά τη φόρτωση πληρωμών: {ex.Message}", Severity.Error);
+            payments = new List<Payment>();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void OnSearchChanged()
+    {
+        // The filtering is handled by the filteredPayments property
+    }
+
+    private async Task OpenNewPaymentDialog()
+    {
+        // TODO: Implement PaymentDialog component
+        Snackbar.Add("Η λειτουργία θα υλοποιηθεί σύντομα", Severity.Info);
+    }
+
+    private async Task ViewPayment(Payment payment)
+    {
+        // TODO: Implement PaymentDialog component
+        Snackbar.Add("Η λειτουργία θα υλοποιηθεί σύντομα", Severity.Info);
+    }
+
+    private async Task EditPayment(Payment payment)
+    {
+        // TODO: Implement PaymentDialog component
+        Snackbar.Add("Η λειτουργία θα υλοποιηθεί σύντομα", Severity.Info);
+    }
+
+    private async Task PrintReceipt(Payment payment)
+    {
+        // TODO: Implement receipt printing/PDF generation
+        Snackbar.Add("Η εκτύπωση απόδειξης θα υλοποιηθεί σύντομα", Severity.Info);
+    }
+
+    private Color GetPaymentMethodColor(PaymentMethod method)
+    {
+        return method switch
+        {
+            PaymentMethod.Cash => Color.Success,
+            PaymentMethod.Card => Color.Primary,
+            PaymentMethod.BankTransfer => Color.Info,
+            PaymentMethod.DigitalWallet => Color.Secondary,
+            PaymentMethod.Check => Color.Warning,
+            _ => Color.Default
+        };
+    }
+
+    private string GetPaymentMethodText(PaymentMethod method)
+    {
+        return method switch
+        {
+            PaymentMethod.Cash => "Μετρητά",
+            PaymentMethod.Card => "Κάρτα",
+            PaymentMethod.BankTransfer => "Έμβασμα",
+            PaymentMethod.DigitalWallet => "Ψηφιακό",
+            PaymentMethod.Check => "Επιταγή",
+            PaymentMethod.Other => "Άλλο",
+            _ => method.ToString()
+        };
+    }
+
+    private Color GetStatusColor(PaymentStatus status)
+    {
+        return status switch
+        {
+            PaymentStatus.Confirmed => Color.Success,
+            PaymentStatus.Pending => Color.Warning,
+            PaymentStatus.Failed => Color.Error,
+            PaymentStatus.Refunded => Color.Info,
+            PaymentStatus.Cancelled => Color.Secondary,
+            _ => Color.Default
+        };
+    }
+
+    private string GetStatusText(PaymentStatus status)
+    {
+        return status switch
+        {
+            PaymentStatus.Confirmed => "Επιβεβαιωμένη",
+            PaymentStatus.Pending => "Εκκρεμής",
+            PaymentStatus.Failed => "Αποτυχημένη",
+            PaymentStatus.Refunded => "Επιστράφηκε",
+            PaymentStatus.Cancelled => "Ακυρωμένη",
+            _ => status.ToString()
+        };
+    }
+}

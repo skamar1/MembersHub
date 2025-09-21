@@ -1,0 +1,278 @@
+@page "/security/devices"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@inject IDeviceTrackingService DeviceTrackingService
+@inject IGeolocationService GeolocationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@attribute [Authorize]
+
+<PageTitle>My Devices</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-6">📱 My Devices</MudText>
+    
+    <MudText Typo="Typo.body1" Class="mb-4" Color="Color.Secondary">
+        Here you can see all devices that have been used to access your account. You can manage trusted devices and revoke access for devices you don't recognize.
+    </MudText>
+
+    <!-- Current Device Info -->
+    <MudCard Class="mb-6" Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">🖥️ Current Device</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (currentDeviceInfo != null)
+            {
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudText Typo="Typo.subtitle2">Device Type</MudText>
+                        <MudText Typo="Typo.body2">@currentDeviceInfo.DeviceType</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudText Typo="Typo.subtitle2">Browser</MudText>
+                        <MudText Typo="Typo.body2">@currentDeviceInfo.Browser @currentDeviceInfo.BrowserVersion</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudText Typo="Typo.subtitle2">Operating System</MudText>
+                        <MudText Typo="Typo.body2">@currentDeviceInfo.OperatingSystem @currentDeviceInfo.OSVersion</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudText Typo="Typo.subtitle2">Your Location</MudText>
+                        <MudText Typo="Typo.body2">@currentLocation</MudText>
+                    </MudItem>
+                </MudGrid>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Registered Devices -->
+    <MudCard Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">🔐 Registered Devices</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="RefreshDevices">
+                    <MudIcon Icon="Icons.Material.Filled.Refresh" Class="mr-2" />
+                    Refresh
+                </MudButton>
+            </CardHeaderActions>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (userDevices.Any())
+            {
+                <MudDataGrid T="UserDevice" Items="@userDevices" Filterable="false" Sortable="true" Dense="true" Hover="true">
+                    <Columns>
+                        <TemplateColumn Title="Device">
+                            <CellTemplate>
+                                <div style="display: flex; align-items: center;">
+                                    @{
+                                        var deviceIcon = GetDeviceIcon(context.Item.DeviceType);
+                                    }
+                                    <MudIcon Icon="@deviceIcon" Class="mr-3" />
+                                    <div>
+                                        <MudText Typo="Typo.body2"><strong>@context.Item.Browser</strong></MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @context.Item.OperatingSystem @context.Item.OSVersion
+                                        </MudText>
+                                    </div>
+                                </div>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        
+                        <TemplateColumn Title="Location">
+                            <CellTemplate>
+                                <div>
+                                    <MudText Typo="Typo.body2">@(context.Item.LastUsedLocation ?? "Unknown")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.LastUsedIpAddress</MudText>
+                                </div>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        
+                        <TemplateColumn Title="Last Used">
+                            <CellTemplate>
+                                <div>
+                                    <MudText Typo="Typo.body2">@context.Item.LastSeenAt.ToString("MMM dd, yyyy")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.LastSeenAt.ToString("HH:mm:ss")</MudText>
+                                </div>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        
+                        <PropertyColumn Property="x => x.TotalLogins" Title="Logins" />
+                        
+                        <TemplateColumn Title="Status">
+                            <CellTemplate>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    @if (context.Item.IsTrusted)
+                                    {
+                                        <MudChip Color="Color.Success" Size="Size.Small" Icon="Icons.Material.Filled.Verified">Trusted</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip Color="Color.Default" Size="Size.Small">Not Trusted</MudChip>
+                                    }
+                                    
+                                    @if (!context.Item.IsActive)
+                                    {
+                                        <MudChip Color="Color.Error" Size="Size.Small">Revoked</MudChip>
+                                    }
+                                </div>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        
+                        <TemplateColumn Title="Actions">
+                            <CellTemplate>
+                                <div style="display: flex; gap: 8px;">
+                                    @if (context.Item.IsActive)
+                                    {
+                                        @if (!context.Item.IsTrusted)
+                                        {
+                                            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Success"
+                                                       OnClick="() => TrustDevice(context.Item)">
+                                                <MudIcon Icon="Icons.Material.Filled.Verified" Size="Size.Small" Class="mr-1" />
+                                                Trust
+                                            </MudButton>
+                                        }
+                                        
+                                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error"
+                                                   OnClick="() => RevokeDevice(context.Item)">
+                                            <MudIcon Icon="Icons.Material.Filled.Block" Size="Size.Small" Class="mr-1" />
+                                            Revoke
+                                        </MudButton>
+                                    }
+                                </div>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                </MudDataGrid>
+            }
+            else
+            {
+                <div style="text-align: center; padding: 40px;">
+                    <MudIcon Icon="Icons.Material.Filled.DevicesOther" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-4">No devices found</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Your devices will appear here after you log in from different devices.</MudText>
+                </div>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Security Tips -->
+    <MudCard Class="mt-6" Elevation="1">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">💡 Security Tips</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudList T="string" Dense="true">
+                <MudListItem T="string" Icon="Icons.Material.Filled.Security">
+                    <MudText Typo="Typo.body2">Regularly review your devices and revoke access for any you don't recognize</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="Icons.Material.Filled.Verified">
+                    <MudText Typo="Typo.body2">Mark devices as trusted only if you use them regularly and they're secure</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="Icons.Material.Filled.Update">
+                    <MudText Typo="Typo.body2">Keep your devices and browsers updated to the latest versions</MudText>
+                </MudListItem>
+                <MudListItem T="string" Icon="Icons.Material.Filled.Logout">
+                    <MudText Typo="Typo.body2">Always log out when using public or shared devices</MudText>
+                </MudListItem>
+            </MudList>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private bool loading = true;
+    private List<UserDevice> userDevices = new();
+    private DeviceInfo? currentDeviceInfo;
+    private string currentLocation = "Detecting...";
+    private int currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+            {
+                currentUserId = userId;
+                await LoadDevices();
+                await LoadCurrentDeviceInfo();
+            }
+        }
+    }
+
+    private async Task LoadDevices()
+    {
+        loading = true;
+        try
+        {
+            userDevices = await DeviceTrackingService.GetUserDevicesAsync(currentUserId);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task LoadCurrentDeviceInfo()
+    {
+        try
+        {
+            var userAgent = await JS.InvokeAsync<string>("eval", "navigator.userAgent");
+            currentDeviceInfo = await DeviceTrackingService.ParseDeviceInfoAsync(userAgent);
+            
+            // Get current location (simplified - in real app you'd use IP geolocation)
+            currentLocation = "Greece, Athens"; // This would come from IP geolocation
+        }
+        catch (Exception)
+        {
+            currentLocation = "Unknown";
+        }
+    }
+
+    private async Task RefreshDevices()
+    {
+        await LoadDevices();
+        Snackbar.Add("Devices refreshed successfully", Severity.Success);
+    }
+
+    private async Task TrustDevice(UserDevice device)
+    {
+        await DeviceTrackingService.MarkDeviceAsTrustedAsync(currentUserId, device.DeviceFingerprint);
+        await LoadDevices();
+        Snackbar.Add($"Device '{device.Browser}' marked as trusted", Severity.Success);
+    }
+
+    private async Task RevokeDevice(UserDevice device)
+    {
+        await DeviceTrackingService.RevokeDeviceAsync(device.Id);
+        await LoadDevices();
+        Snackbar.Add($"Device '{device.Browser}' has been revoked", Severity.Success);
+    }
+
+    private static string GetDeviceIcon(string? deviceType)
+    {
+        return deviceType?.ToLower() switch
+        {
+            "mobile" => Icons.Material.Filled.PhoneAndroid,
+            "tablet" => Icons.Material.Filled.Tablet,
+            "desktop" => Icons.Material.Filled.Computer,
+            _ => Icons.Material.Filled.DevicesOther
+        };
+    }
+}

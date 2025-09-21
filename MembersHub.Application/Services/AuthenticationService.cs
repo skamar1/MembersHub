@@ -18,18 +18,35 @@ public class AuthenticationService : IAuthenticationService
     private readonly MembersHubContext _context;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthenticationService> _logger;
+    private readonly ISecurityEventService _securityEventService;
+    private readonly IAccountLockoutService _accountLockoutService;
+    private readonly IDeviceTrackingService _deviceTrackingService;
+    private readonly IPasswordSecurityService _passwordSecurityService;
 
     public AuthenticationService(
         MembersHubContext context,
         IConfiguration configuration,
-        ILogger<AuthenticationService> logger)
+        ILogger<AuthenticationService> logger,
+        ISecurityEventService securityEventService,
+        IAccountLockoutService accountLockoutService,
+        IDeviceTrackingService deviceTrackingService,
+        IPasswordSecurityService passwordSecurityService)
     {
         _context = context;
         _configuration = configuration;
         _logger = logger;
+        _securityEventService = securityEventService;
+        _accountLockoutService = accountLockoutService;
+        _deviceTrackingService = deviceTrackingService;
+        _passwordSecurityService = passwordSecurityService;
     }
 
     public async Task<AuthenticationResult> AuthenticateAsync(string username, string password)
+    {
+        return await AuthenticateAsync(username, password, "127.0.0.1", null);
+    }
+
+    public async Task<AuthenticationResult> AuthenticateAsync(string username, string password, string ipAddress, string? userAgent = null)
     {
         try
         {
@@ -38,7 +55,11 @@ public class AuthenticationService : IAuthenticationService
 
             if (user == null)
             {
-                _logger.LogWarning("Authentication failed: User '{Username}' not found or inactive", username);
+                _logger.LogWarning("Authentication failed: User '{Username}' not found or inactive from IP {IpAddress}", username, ipAddress);
+                
+                // Log failed security event for non-existent user
+                await LogSecurityEventAsync(0, SecurityEventType.LoginFailure, ipAddress, userAgent, false);
+                
                 return new AuthenticationResult 
                 { 
                     IsSuccess = false, 
@@ -46,15 +67,50 @@ public class AuthenticationService : IAuthenticationService
                 };
             }
 
+            // Check account lockout
+            var isLocked = await _accountLockoutService.IsAccountLockedOutAsync(user.Id);
+            if (isLocked)
+            {
+                var remainingTime = await _accountLockoutService.GetRemainingLockoutTimeAsync(user.Id);
+                await LogSecurityEventAsync(user.Id, SecurityEventType.LoginFailure, ipAddress, userAgent, false);
+                
+                _logger.LogWarning("Login attempt for locked account: User '{Username}' from IP {IpAddress}", username, ipAddress);
+                
+                return new AuthenticationResult
+                {
+                    IsSuccess = false,
+                    IsAccountLocked = true,
+                    LockoutTimeRemaining = remainingTime,
+                    ErrorMessage = $"Ο λογαριασμός είναι κλειδωμένος. Δοκιμάστε ξανά σε {remainingTime?.TotalMinutes:F0} λεπτά."
+                };
+            }
+
             if (!await ValidatePasswordAsync(password, user.PasswordHash))
             {
-                _logger.LogWarning("Authentication failed: Invalid password for user '{Username}'", username);
+                _logger.LogWarning("Authentication failed: Invalid password for user '{Username}' from IP {IpAddress}", username, ipAddress);
+                
+                // Record failed attempt
+                await _accountLockoutService.RecordFailedLoginAttemptAsync(user.Id, ipAddress, userAgent);
+                await LogSecurityEventAsync(user.Id, SecurityEventType.LoginFailure, ipAddress, userAgent, false);
+                
                 return new AuthenticationResult 
                 { 
                     IsSuccess = false, 
                     ErrorMessage = "Λάθος όνομα χρήστη ή κωδικός πρόσβασης" 
                 };
             }
+
+            // Assess login risk
+            var riskAssessment = await _securityEventService.AssessLoginRiskAsync(user.Id, ipAddress, userAgent);
+
+            // Track device
+            var device = await _deviceTrackingService.GetOrCreateDeviceAsync(user.Id, userAgent ?? "", ipAddress);
+
+            // Reset failed attempts on successful login
+            await _accountLockoutService.ResetFailedAttemptsAsync(user.Id);
+
+            // Log successful security event
+            await LogSecurityEventAsync(user.Id, SecurityEventType.LoginSuccess, ipAddress, userAgent, true);
 
             // Update last login
             user.LastLoginAt = DateTime.UtcNow;
@@ -63,19 +119,22 @@ public class AuthenticationService : IAuthenticationService
             var token = await GenerateJwtTokenAsync(user);
             var expiresAt = DateTime.UtcNow.AddHours(GetTokenExpirationHours());
 
-            _logger.LogInformation("User '{Username}' authenticated successfully", username);
+            _logger.LogInformation("User '{Username}' authenticated successfully from IP {IpAddress}", username, ipAddress);
 
             return new AuthenticationResult
             {
                 IsSuccess = true,
                 Token = token,
                 User = user,
-                ExpiresAt = expiresAt
+                ExpiresAt = expiresAt,
+                RiskAssessment = riskAssessment,
+                RequiresTwoFactor = riskAssessment.RequiresTwoFactor,
+                RequiresDeviceVerification = riskAssessment.RequiresDeviceVerification
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during authentication for user '{Username}'", username);
+            _logger.LogError(ex, "Error during authentication for user '{Username}' from IP {IpAddress}", username, ipAddress);
             return new AuthenticationResult 
             { 
                 IsSuccess = false, 
@@ -156,6 +215,25 @@ public class AuthenticationService : IAuthenticationService
         // In production, you might want to blacklist tokens or use shorter expiration times
         _logger.LogInformation("User logged out with token: {TokenPrefix}...", token[..Math.Min(token.Length, 10)]);
         await Task.CompletedTask;
+    }
+
+    public async Task<SecurityRiskAssessment> AssessLoginRiskAsync(int userId, string ipAddress, string? userAgent = null)
+    {
+        return await _securityEventService.AssessLoginRiskAsync(userId, ipAddress, userAgent);
+    }
+
+    public async Task LogSecurityEventAsync(int userId, SecurityEventType eventType, string ipAddress, string? userAgent = null, bool isSuccessful = true)
+    {
+        var request = new SecurityEventRequest
+        {
+            UserId = userId,
+            EventType = eventType,
+            IpAddress = ipAddress,
+            UserAgent = userAgent,
+            IsSuccessful = isSuccessful
+        };
+
+        await _securityEventService.LogSecurityEventAsync(request);
     }
 
     private string GetJwtSecret()

@@ -1,0 +1,186 @@
+@using MembersHub.Infrastructure.Data
+@using MembersHub.Core.Entities
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using MudBlazor
+@attribute [Authorize(Roles = "Admin,Owner")]
+@inject MembersHubContext Context
+@rendermode InteractiveServer
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Warning" Class="mr-2" />
+                        <MudText Typo="Typo.h6">Επαναφορές Κωδικών</MudText>
+                    </div>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudList T="string">
+                    @if (recentPasswordResets?.Any() == true)
+                    {
+                        @foreach (var reset in recentPasswordResets.Take(5))
+                        {
+                            <MudListItem T="string">
+                                <div class="d-flex justify-space-between align-center">
+                                    <div>
+                                        <MudText Typo="Typo.body2">@reset.User.Email</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @reset.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                        </MudText>
+                                    </div>
+                                    <MudChip T="string" Color="@(reset.IsUsed ? Color.Success : Color.Warning)" Size="Size.Small">
+                                        @(reset.IsUsed ? "Χρησιμοποιήθηκε" : "Εκκρεμεί")
+                                    </MudChip>
+                                </div>
+                            </MudListItem>
+                            <MudDivider />
+                        }
+                    }
+                    else
+                    {
+                        <MudListItem T="string">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Δεν υπάρχουν πρόσφατες επαναφορές κωδικών
+                            </MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="/audit-logs">
+                    Προβολή Όλων
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Class="mr-2" />
+                        <MudText Typo="Typo.h6">Rate Limit Events</MudText>
+                    </div>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudList T="string">
+                    @if (rateLimitStats?.Any() == true)
+                    {
+                        @foreach (var stat in rateLimitStats.Take(5))
+                        {
+                            <MudListItem T="string">
+                                <div class="d-flex justify-space-between align-center">
+                                    <div>
+                                        <MudText Typo="Typo.body2">@stat.Identifier</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @stat.AttemptCount προσπάθειες - @stat.LastAttemptAt.ToString("dd/MM HH:mm")
+                                        </MudText>
+                                    </div>
+                                    <MudChip T="string" Color="@(stat.AttemptCount >= 3 ? Color.Error : Color.Warning)" Size="Size.Small">
+                                        @stat.AttemptCount/5
+                                    </MudChip>
+                                </div>
+                            </MudListItem>
+                            <MudDivider />
+                        }
+                    }
+                    else
+                    {
+                        <MudListItem T="string">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Δεν υπάρχουν πρόσφατα rate limit events
+                            </MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" 
+                           OnClick="ClearOldRateLimits" Disabled="isClearing">
+                    @if (isClearing)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                        <MudText Class="ms-2">Καθαρισμός...</MudText>
+                    }
+                    else
+                    {
+                        <MudText>Καθαρισμός Παλιών</MudText>
+                    }
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<PasswordResetToken>? recentPasswordResets;
+    private List<PasswordResetRateLimit>? rateLimitStats;
+    private bool isClearing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInsights();
+    }
+
+    private async Task LoadInsights()
+    {
+        try
+        {
+            var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
+            
+            // Load recent password resets
+            recentPasswordResets = await Context.PasswordResetTokens
+                .Include(p => p.User)
+                .Where(p => p.CreatedAt >= sevenDaysAgo)
+                .OrderByDescending(p => p.CreatedAt)
+                .ToListAsync();
+
+            // Load rate limit statistics
+            var yesterday = DateTime.UtcNow.AddDays(-1);
+            rateLimitStats = await Context.PasswordResetRateLimits
+                .Where(r => r.LastAttemptAt >= yesterday)
+                .OrderByDescending(r => r.AttemptCount)
+                .ThenByDescending(r => r.LastAttemptAt)
+                .ToListAsync();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            // Log error - in production you'd want proper error handling
+            Console.WriteLine($"Error loading admin insights: {ex.Message}");
+        }
+    }
+
+    private async Task ClearOldRateLimits()
+    {
+        isClearing = true;
+        try
+        {
+            var cutoffTime = DateTime.UtcNow.AddHours(-2); // Keep records for 2 hours
+            
+            var oldRecords = await Context.PasswordResetRateLimits
+                .Where(r => r.WindowStartAt < cutoffTime)
+                .ToListAsync();
+                
+            if (oldRecords.Any())
+            {
+                Context.PasswordResetRateLimits.RemoveRange(oldRecords);
+                await Context.SaveChangesAsync();
+                
+                // Reload the data
+                await LoadInsights();
+            }
+        }
+        finally
+        {
+            isClearing = false;
+        }
+    }
+}

@@ -1,0 +1,91 @@
+@using MudBlazor
+@using Microsoft.AspNetCore.Components
+@using MembersHub.Web.Models
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        <MudContainer Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-4">📅 Επιλέξτε Περίοδο για Δημιουργία Συνδρομών</MudText>
+
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                Θα δημιουργηθούν συνδρομές για όλα τα ενεργά μέλη με βάση τον τύπο συνδρομής που έχουν.
+            </MudAlert>
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" Label="Έτος" @bind-Value="selectedYear">
+                        @for (int year = DateTime.Now.Year - 1; year <= DateTime.Now.Year + 1; year++)
+                        {
+                            <MudSelectItem Value="@year">@year</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" Label="Μήνας" @bind-Value="selectedMonth">
+                        <MudSelectItem Value="1">Ιανουάριος</MudSelectItem>
+                        <MudSelectItem Value="2">Φεβρουάριος</MudSelectItem>
+                        <MudSelectItem Value="3">Μάρτιος</MudSelectItem>
+                        <MudSelectItem Value="4">Απρίλιος</MudSelectItem>
+                        <MudSelectItem Value="5">Μάιος</MudSelectItem>
+                        <MudSelectItem Value="6">Ιούνιος</MudSelectItem>
+                        <MudSelectItem Value="7">Ιούλιος</MudSelectItem>
+                        <MudSelectItem Value="8">Αύγουστος</MudSelectItem>
+                        <MudSelectItem Value="9">Σεπτέμβριος</MudSelectItem>
+                        <MudSelectItem Value="10">Οκτώβριος</MudSelectItem>
+                        <MudSelectItem Value="11">Νοέμβριος</MudSelectItem>
+                        <MudSelectItem Value="12">Δεκέμβριος</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.body2" Class="mt-4" Color="Color.Secondary">
+                Επιλεγμένη περίοδος: <strong>@GetMonthName(selectedMonth) @selectedYear</strong>
+            </MudText>
+        </MudContainer>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Ακύρωση</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">
+            <MudIcon Icon="Icons.Material.Filled.Add" Class="mr-2" />
+            Δημιουργία Συνδρομών
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public int Year { get; set; } = DateTime.Now.Year;
+    [Parameter] public int Month { get; set; } = DateTime.Now.Month;
+
+    private int selectedYear;
+    private int selectedMonth;
+
+    protected override void OnInitialized()
+    {
+        selectedYear = Year;
+        selectedMonth = Month;
+    }
+
+    void Submit()
+    {
+        var result = new GenerateSubscriptionsResult
+        {
+            Year = selectedYear,
+            Month = selectedMonth
+        };
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private string GetMonthName(int month)
+    {
+        var monthNames = new[] { "", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος",
+                                "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος" };
+        return month >= 1 && month <= 12 ? monthNames[month] : month.ToString();
+    }
+}
+

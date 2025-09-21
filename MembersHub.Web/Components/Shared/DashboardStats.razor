@@ -1,0 +1,96 @@
+@using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using MudBlazor
+@inject MembersHubContext Context
+@inject IEmailConfigurationService EmailConfigService
+@rendermode InteractiveServer
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="pa-4 mud-height-full">
+            <MudCardContent Class="text-center pa-0">
+                <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                <MudText Typo="Typo.h4" Color="Color.Primary">@totalMembers</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Σύνολο Μελών</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="pa-4 mud-height-full">
+            <MudCardContent Class="text-center pa-0">
+                <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+                <MudText Typo="Typo.h4" Color="Color.Secondary">@activeUsers</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Ενεργοί Χρήστες</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="pa-4 mud-height-full">
+            <MudCardContent Class="text-center pa-0">
+                <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Large" Color="@emailStatusColor" Class="mb-2" />
+                <MudText Typo="Typo.h6" Color="@emailStatusColor">@emailStatusText</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Κατάσταση Email</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="pa-4 mud-height-full">
+            <MudCardContent Class="text-center pa-0">
+                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" Color="Color.Dark" Class="mb-2" />
+                <MudText Typo="Typo.h4" Color="Color.Dark">@recentActions</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Ενέργειες (24ω)</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private int totalMembers = 0;
+    private int activeUsers = 0;
+    private int recentActions = 0;
+    private string emailStatusText = "Φόρτωση...";
+    private Color emailStatusColor = Color.Default;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatistics();
+    }
+
+    private async Task LoadStatistics()
+    {
+        try
+        {
+            // Load member count
+            totalMembers = await Context.Members.CountAsync();
+
+            // Load active user count
+            activeUsers = await Context.Users.CountAsync(u => u.IsActive);
+
+            // Load recent actions count (last 24 hours)
+            var yesterday = DateTime.UtcNow.AddDays(-1);
+            recentActions = await Context.AuditLogs.CountAsync(a => a.Timestamp >= yesterday);
+
+            // Check email configuration status
+            var emailSettings = await EmailConfigService.GetActiveEmailSettingsAsync();
+            if (emailSettings != null)
+            {
+                emailStatusText = "Ρυθμισμένα";
+                emailStatusColor = Color.Success;
+            }
+            else
+            {
+                emailStatusText = "Απαιτείται Ρύθμιση";
+                emailStatusColor = Color.Warning;
+            }
+        }
+        catch (Exception)
+        {
+            emailStatusText = "Σφάλμα";
+            emailStatusColor = Color.Error;
+        }
+    }
+}

@@ -1,0 +1,250 @@
+@page "/financial/membership-types"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@using MembersHub.Web.Components.Financial
+@inject IMembershipTypeService MembershipTypeService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@attribute [Authorize(Roles = "Admin,Owner")]
+
+<PageTitle>Διαχείριση Τύπων Συνδρομής</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <div class="d-flex justify-space-between align-center mb-6">
+        <MudText Typo="Typo.h4">🏷️ Διαχείριση Τύπων Συνδρομής</MudText>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="OpenCreateDialog">
+            <MudIcon Icon="Icons.Material.Filled.Add" Class="mr-2" />
+            Νέος Τύπος Συνδρομής
+        </MudButton>
+    </div>
+
+    <!-- Summary Cards -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Style="background: linear-gradient(45deg, #f8f9fa, #e9ecef);">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.Category" Color="Color.Primary" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@membershipTypes.Count</MudText>
+                    <MudText Typo="Typo.body2">Συνολικοί Τύποι</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Style="background: linear-gradient(45deg, #d4edda, #c3e6cb);">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@membershipTypes.Count(mt => mt.IsActive)</MudText>
+                    <MudText Typo="Typo.body2">Ενεργοί Τύποι</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Style="background: linear-gradient(45deg, #fff3cd, #ffeaa7);">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.People" Color="Color.Warning" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@membershipTypes.Sum(mt => mt.Members.Count)</MudText>
+                    <MudText Typo="Typo.body2">Συνολικά Μέλη</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Style="background: linear-gradient(45deg, #d1ecf1, #bee5eb);">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.Euro" Color="Color.Info" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">€@membershipTypes.Where(mt => mt.IsActive).Average(mt => mt.MonthlyFee).ToString("N2")</MudText>
+                    <MudText Typo="Typo.body2">Μέσο Τέλος</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Membership Types Table -->
+    <MudCard Elevation="3">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Τύποι Συνδρομής</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent Class="pa-0">
+            <MudDataGrid T="MembershipType" Items="@membershipTypes" Filterable="true" SortMode="@SortMode.Multiple"
+                         Loading="@loading" LoadingProgressColor="Color.Info" Hover="true"
+                         RowsPerPage="10" Elevation="0">
+                <Columns>
+                    <PropertyColumn Property="x => x.Id" Title="ID" />
+                    <PropertyColumn Property="x => x.Name" Title="Όνομα" />
+                    <PropertyColumn Property="x => x.MonthlyFee" Title="Μηνιαίο Τέλος" Format="C2">
+                        <CellTemplate>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">€@context.Item.MonthlyFee.ToString("N2")</MudText>
+                        </CellTemplate>
+                    </PropertyColumn>
+                    <PropertyColumn Property="x => x.Description" Title="Περιγραφή">
+                        <CellTemplate>
+                            @if (!string.IsNullOrWhiteSpace(context.Item.Description))
+                            {
+                                <MudText Typo="Typo.body2">@context.Item.Description</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Χωρίς περιγραφή</MudText>
+                            }
+                        </CellTemplate>
+                    </PropertyColumn>
+                    <TemplateColumn Title="Μέλη">
+                        <CellTemplate>
+                            <div class="d-flex align-center">
+                                <MudIcon Icon="Icons.Material.Filled.People" Size="Size.Small" Class="mr-2" />
+                                <MudText Typo="Typo.body2">@context.Item.Members.Count</MudText>
+                            </div>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.IsActive" Title="Κατάσταση">
+                        <CellTemplate>
+                            <MudChip Size="Size.Small" Color="@(context.Item.IsActive ? Color.Success : Color.Default)"
+                                     Icon="@(context.Item.IsActive ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)">
+                                @(context.Item.IsActive ? "Ενεργός" : "Ανενεργός")
+                            </MudChip>
+                        </CellTemplate>
+                    </PropertyColumn>
+                    <TemplateColumn Title="Ενέργειες" CellClass="d-flex justify-end">
+                        <CellTemplate>
+                            <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                                <MudIconButton Icon="Icons.Material.Filled.Edit" Color="Color.Primary"
+                                               OnClick="() => OpenEditDialog(context.Item)"
+                                               Title="Επεξεργασία" />
+                                @if (context.Item.Members.Count == 0)
+                                {
+                                    <MudIconButton Icon="Icons.Material.Filled.Delete" Color="Color.Error"
+                                                   OnClick="() => DeleteMembershipType(context.Item)"
+                                                   Title="Διαγραφή" />
+                                }
+                                else
+                                {
+                                    <MudIconButton Icon="Icons.Material.Filled.Delete" Color="Color.Error"
+                                                   OnClick="() => ShowCannotDeleteMessage(context.Item)"
+                                                   Title="Δεν μπορεί να διαγραφεί" />
+                                }
+                            </MudButtonGroup>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+                <PagerContent>
+                    <MudDataGridPager T="MembershipType" />
+                </PagerContent>
+            </MudDataGrid>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private bool loading = true;
+    private List<MembershipType> membershipTypes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMembershipTypes();
+    }
+
+    private async Task LoadMembershipTypes()
+    {
+        loading = true;
+        try
+        {
+            var types = await MembershipTypeService.GetAllAsync();
+            membershipTypes = types.ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα κατά τη φόρτωση τύπων συνδρομής: {ex.Message}", Severity.Error);
+            membershipTypes = new List<MembershipType>();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "MembershipType", new MembershipType { IsActive = true } },
+            { "IsEdit", false }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<MembershipTypeDialog>(
+            "Νέος Τύπος Συνδρομής",
+            parameters,
+            options);
+
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await LoadMembershipTypes();
+        }
+    }
+
+    private async Task OpenEditDialog(MembershipType membershipType)
+    {
+        var parameters = new DialogParameters
+        {
+            { "MembershipType", membershipType },
+            { "IsEdit", true }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<MembershipTypeDialog>(
+            "Επεξεργασία Τύπου Συνδρομής",
+            parameters,
+            options);
+
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await LoadMembershipTypes();
+        }
+    }
+
+    private async Task DeleteMembershipType(MembershipType membershipType)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Επιβεβαίωση Διαγραφής",
+            $"Θέλετε να διαγράψετε τον τύπο συνδρομής '{membershipType.Name}';",
+            yesText: "Διαγραφή", cancelText: "Ακύρωση");
+
+        if (result == true)
+        {
+            try
+            {
+                await MembershipTypeService.DeleteAsync(membershipType.Id);
+                Snackbar.Add($"Ο τύπος συνδρομής '{membershipType.Name}' διαγράφηκε επιτυχώς!", Severity.Success);
+                await LoadMembershipTypes();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Σφάλμα κατά τη διαγραφή: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ShowCannotDeleteMessage(MembershipType membershipType)
+    {
+        await DialogService.ShowMessageBox(
+            "Αδυναμία Διαγραφής",
+            $"Δεν μπορείτε να διαγράψετε τον τύπο συνδρομής '{membershipType.Name}' γιατί έχει αντιστοιχισμένα μέλη ({membershipType.Members.Count}).\n\nΠρώτα μεταφέρετε τα μέλη σε άλλον τύπο συνδρομής.",
+            yesText: "Κατανοητό");
+    }
+}

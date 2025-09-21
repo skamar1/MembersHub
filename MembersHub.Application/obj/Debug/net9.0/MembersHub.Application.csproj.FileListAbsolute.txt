@@ -10,6 +10,7 @@
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.AssemblyInfoInputs.cache
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.AssemblyInfo.cs
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.csproj.CoreCompileInputs.cache
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.sourcelink.json
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersH.3DB4D641.Up2Date
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/MembersHub.Application.dll
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/obj/Debug/net9.0/refint/MembersHub.Application.dll

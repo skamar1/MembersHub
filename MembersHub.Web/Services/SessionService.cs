@@ -1,6 +1,10 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.JSInterop;
 using MembersHub.Core.Entities;
 using MembersHub.Core.Interfaces;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 using System.Text.Json;
 
 namespace MembersHub.Web.Services;
@@ -9,15 +13,17 @@ public class SessionService : ISessionService
 {
     private readonly IJSRuntime _jsRuntime;
     private readonly IAuthenticationService _authService;
+    private readonly IConfiguration _configuration;
     private User? _currentUser;
     private string? _token;
-    
+
     public event Action? AuthenticationStateChanged;
 
-    public SessionService(IJSRuntime jsRuntime, IAuthenticationService authService)
+    public SessionService(IJSRuntime jsRuntime, IAuthenticationService authService, IConfiguration configuration)
     {
         _jsRuntime = jsRuntime;
         _authService = authService;
+        _configuration = configuration;
     }
 
     public async Task<bool> CreateSessionAsync(User user, string token)
@@ -108,8 +114,38 @@ public class SessionService : ISessionService
         if (string.IsNullOrEmpty(token))
             return false;
 
-        // TODO: Validate token expiration
-        // For now, just check if token exists
-        return true;
+        try
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var jwtSecret = _configuration["Jwt:Secret"] ?? "MembersHub-SuperSecretKey-ChangeInProduction-AtLeast32Characters!";
+            var key = Encoding.ASCII.GetBytes(jwtSecret);
+
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = true,
+                ValidIssuer = _configuration["Jwt:Issuer"] ?? "MembersHub",
+                ValidateAudience = true,
+                ValidAudience = _configuration["Jwt:Audience"] ?? "MembersHub",
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            };
+
+            tokenHandler.ValidateToken(token, validationParameters, out SecurityToken validatedToken);
+            return validatedToken != null;
+        }
+        catch (SecurityTokenExpiredException)
+        {
+            // Token has expired, clear it
+            await LogoutAsync();
+            return false;
+        }
+        catch (Exception)
+        {
+            // Token is invalid, clear it
+            await LogoutAsync();
+            return false;
+        }
     }
 }

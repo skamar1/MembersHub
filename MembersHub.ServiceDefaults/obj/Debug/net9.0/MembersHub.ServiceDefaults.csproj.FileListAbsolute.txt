@@ -6,6 +6,7 @@
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.ServiceDefaults/obj/Debug/net9.0/MembersHub.ServiceDefaults.AssemblyInfoInputs.cache
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.ServiceDefaults/obj/Debug/net9.0/MembersHub.ServiceDefaults.AssemblyInfo.cs
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.ServiceDefaults/obj/Debug/net9.0/MembersHub.ServiceDefaults.csproj.CoreCompileInputs.cache
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.ServiceDefaults/obj/Debug/net9.0/MembersHub.ServiceDefaults.sourcelink.json
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.ServiceDefaults/obj/Debug/net9.0/MembersHub.ServiceDefaults.dll
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.ServiceDefaults/obj/Debug/net9.0/refint/MembersHub.ServiceDefaults.dll
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.ServiceDefaults/obj/Debug/net9.0/MembersHub.ServiceDefaults.pdb

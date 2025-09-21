@@ -1,0 +1,142 @@
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MudBlazor
+@using Microsoft.AspNetCore.Components
+@inject IMembershipTypeService MembershipTypeService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudContainer Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-4">
+                @(IsEdit ? "✏️ Επεξεργασία Τύπου Συνδρομής" : "➕ Νέος Τύπος Συνδρομής")
+            </MudText>
+
+            <MudForm @ref="form" @bind-IsValid="@isFormValid">
+                <MudTextField @bind-Value="membershipType.Name"
+                              Label="Όνομα Τύπου"
+                              Required="true"
+                              RequiredError="Το όνομα είναι υποχρεωτικό"
+                              Placeholder="π.χ. Ενήλικες, Παιδιά, Φοιτητές"
+                              Class="mb-4" />
+
+                <MudNumericField @bind-Value="membershipType.MonthlyFee"
+                                 Label="Μηνιαίο Τέλος (€)"
+                                 Required="true"
+                                 Min="0"
+                                 Format="N2"
+                                 Placeholder="0.00"
+                                 Class="mb-4"
+                                 Adornment="Adornment.Start"
+                                 AdornmentIcon="Icons.Material.Filled.Euro" />
+
+                <MudTextField @bind-Value="membershipType.Description"
+                              Label="Περιγραφή (προαιρετική)"
+                              Lines="3"
+                              Placeholder="Προσθέστε μια περιγραφή για τον τύπο συνδρομής..."
+                              Class="mb-4" />
+
+                <MudSwitch @bind-Value="membershipType.IsActive"
+                           Label="Ενεργός Τύπος"
+                           Color="Color.Success"
+                           Class="mb-4" />
+
+                @if (IsEdit && membershipType.Members.Any())
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-4">
+                        Αυτός ο τύπος συνδρομής έχει <strong>@membershipType.Members.Count μέλη</strong> αντιστοιχισμένα.
+                        Οι αλλαγές στο μηνιαίο τέλος θα επηρεάσουν τις μελλοντικές συνδρομές.
+                    </MudAlert>
+                }
+
+                @if (!membershipType.IsActive)
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mb-4">
+                        Οι ανενεργοί τύποι συνδρομής δεν θα συμπεριληφθούν στη δημιουργία νέων συνδρομών.
+                    </MudAlert>
+                }
+            </MudForm>
+        </MudContainer>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Ακύρωση</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="!isFormValid || saving">
+            @if (saving)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true"/>
+                <MudText Class="ms-2">Αποθήκευση...</MudText>
+            }
+            else
+            {
+                <MudIcon Icon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)" Class="mr-2" />
+                @(IsEdit ? "Ενημέρωση" : "Δημιουργία")
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public MembershipType MembershipType { get; set; } = new();
+    [Parameter] public bool IsEdit { get; set; } = false;
+
+    private MembershipType membershipType = new();
+    private MudForm form = null!;
+    private bool isFormValid = false;
+    private bool saving = false;
+
+    protected override void OnInitialized()
+    {
+        // Create a copy to avoid modifying the original object until save
+        membershipType = new MembershipType
+        {
+            Id = MembershipType.Id,
+            Name = MembershipType.Name,
+            MonthlyFee = MembershipType.MonthlyFee,
+            Description = MembershipType.Description,
+            IsActive = MembershipType.IsActive,
+            Members = MembershipType.Members
+        };
+    }
+
+    private async Task Submit()
+    {
+        if (!isFormValid) return;
+
+        saving = true;
+        try
+        {
+            if (IsEdit)
+            {
+                await MembershipTypeService.UpdateAsync(membershipType);
+                Snackbar.Add($"Ο τύπος συνδρομής '{membershipType.Name}' ενημερώθηκε επιτυχώς!", Severity.Success);
+            }
+            else
+            {
+                await MembershipTypeService.CreateAsync(membershipType);
+                Snackbar.Add($"Ο τύπος συνδρομής '{membershipType.Name}' δημιουργήθηκε επιτυχώς!", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ArgumentException ex)
+        {
+            Snackbar.Add($"Σφάλμα επικύρωσης: {ex.Message}", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα κατά την αποθήκευση: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

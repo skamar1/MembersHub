@@ -12,11 +12,12 @@ public static class DependencyInjection
         services.AddScoped<IMemberService, MemberService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IAuditService, AuditService>();
-        
+        services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<ISubscriptionService, SubscriptionService>();
+        services.AddScoped<IMembershipTypeService, MembershipTypeService>();
+
         // Add more services here as we implement them
-        // services.AddScoped<IPaymentService, PaymentService>();
-        // services.AddScoped<ISubscriptionService, SubscriptionService>();
-        // services.AddScoped<IExpenseService, ExpenseService>();
+        services.AddScoped<IExpenseService, ExpenseService>();
         
         return services;
     }

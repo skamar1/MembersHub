@@ -53,7 +53,6 @@ public class EmailSettings
     [StringLength(200)]
     public string? PasswordResetSubject { get; set; } = "Επαναφορά κωδικού πρόσβασης - MembersHub";
     
-    [Column(TypeName = "nvarchar(max)")]
     public string? PasswordResetTemplate { get; set; }
     
     // Helper methods for password encryption/decryption

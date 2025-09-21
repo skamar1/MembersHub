@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MembersHub.Core.Interfaces;
 
@@ -7,13 +8,16 @@ namespace MembersHub.Infrastructure.Services;
 public class EmailNotificationService : IEmailNotificationService
 {
     private readonly IEmailConfigurationService _emailConfigService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<EmailNotificationService> _logger;
 
     public EmailNotificationService(
         IEmailConfigurationService emailConfigService,
+        IConfiguration configuration,
         ILogger<EmailNotificationService> logger)
     {
         _emailConfigService = emailConfigService;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -100,10 +104,48 @@ public class EmailNotificationService : IEmailNotificationService
         }
     }
 
-    private static string GenerateResetLink(string resetToken)
+    public async Task<(bool Success, string Message)> SendEmailAsync(string email, string subject, string body)
     {
-        // TODO: This should use the actual base URL from configuration
-        return $"https://localhost:7004/reset-password?token={resetToken}";
+        try
+        {
+            var emailSettings = await _emailConfigService.GetActiveEmailSettingsAsync();
+            if (emailSettings == null)
+            {
+                return (false, "Email settings not configured.");
+            }
+
+            var message = new MailMessage
+            {
+                From = new MailAddress(emailSettings.FromEmail, emailSettings.FromName),
+                Subject = subject,
+                Body = body,
+                IsBodyHtml = true
+            };
+            
+            message.To.Add(email);
+
+            using var client = new SmtpClient(emailSettings.SmtpHost, emailSettings.SmtpPort)
+            {
+                EnableSsl = emailSettings.EnableSsl,
+                Credentials = new System.Net.NetworkCredential(emailSettings.Username, emailSettings.DecryptedPassword)
+            };
+
+            await client.SendMailAsync(message);
+            
+            _logger.LogInformation("Email sent successfully to {Email} with subject: {Subject}", email, subject);
+            return (true, "Email sent successfully.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email to {Email} with subject: {Subject}", email, subject);
+            return (false, "Failed to send email. Please try again.");
+        }
+    }
+
+    private string GenerateResetLink(string resetToken)
+    {
+        var baseUrl = _configuration["App:BaseUrl"] ?? "https://localhost:7135";
+        return $"{baseUrl.TrimEnd('/')}/reset-password?token={resetToken}";
     }
 
     private static string GeneratePasswordResetEmailBody(string userName, string resetLink, string? customTemplate)
@@ -113,6 +155,7 @@ public class EmailNotificationService : IEmailNotificationService
             return customTemplate
                 .Replace("{UserName}", userName)
                 .Replace("{ResetLink}", resetLink)
+                .Replace("{ResetUrl}", resetLink)  // Support both placeholders
                 .Replace("{ExpirationHours}", "1");
         }
 

@@ -1,0 +1,160 @@
+@using MembersHub.Core.Entities
+@using MembersHub.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using MudBlazor
+@inject MembersHubContext DbContext
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@isValid">
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        Επεξεργασία Συνδρομής - @subscription?.Member.FirstName @subscription?.Member.LastName
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="editedAmount"
+                                  Label="Ποσό (€)"
+                                  Required="true"
+                                  RequiredError="Το ποσό είναι υποχρεωτικό"
+                                  Format="N2"
+                                  InputType="InputType.Number"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="editedDueDate"
+                                   Label="Καταληκτική Ημερομηνία"
+                                   Required="true"
+                                   RequiredError="Η καταληκτική ημερομηνία είναι υποχρεωτική"
+                                   DateFormat="dd/MM/yyyy"
+                                   Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect @bind-Value="editedStatus"
+                               Label="Κατάσταση"
+                               Required="true"
+                               RequiredError="Επιλέξτε κατάσταση"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="SubscriptionStatus.Pending">Εκκρεμής</MudSelectItem>
+                        <MudSelectItem Value="SubscriptionStatus.Paid">Πληρωμένη</MudSelectItem>
+                        <MudSelectItem Value="SubscriptionStatus.Overdue">Καθυστερημένη</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="editedNotes"
+                                  Label="Σημειώσεις"
+                                  Lines="3"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Μέλος: @subscription?.Member.FirstName @subscription?.Member.LastName (@subscription?.Member.MemberNumber)
+                    </MudText>
+                    <br />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Περίοδος: @GetMonthName(subscription?.Month ?? 0) @subscription?.Year
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Άκυρο</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Save"
+                   Disabled="@(!isValid || processing)">
+            @if (processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Αποθήκευση...</MudText>
+            }
+            else
+            {
+                <MudText>Αποθήκευση</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Subscription? Subscription { get; set; }
+
+    private MudForm form = null!;
+    private bool isValid;
+    private bool processing;
+
+    private Subscription? subscription;
+    private decimal editedAmount;
+    private DateTime? editedDueDate;
+    private SubscriptionStatus editedStatus;
+    private string editedNotes = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Subscription != null)
+        {
+            // Load the subscription with member data
+            subscription = await DbContext.Subscriptions
+                .Include(s => s.Member)
+                .FirstOrDefaultAsync(s => s.Id == Subscription.Id);
+
+            if (subscription != null)
+            {
+                editedAmount = subscription.Amount;
+                editedDueDate = subscription.DueDate;
+                editedStatus = subscription.Status;
+                editedNotes = subscription.Notes ?? "";
+            }
+        }
+    }
+
+    private async Task Save()
+    {
+        if (subscription == null) return;
+
+        processing = true;
+        try
+        {
+            subscription.Amount = editedAmount;
+            subscription.DueDate = editedDueDate ?? subscription.DueDate;
+            subscription.Status = editedStatus;
+            subscription.Notes = string.IsNullOrWhiteSpace(editedNotes) ? null : editedNotes;
+
+            DbContext.Subscriptions.Update(subscription);
+            await DbContext.SaveChangesAsync();
+
+            Snackbar.Add("Η συνδρομή ενημερώθηκε επιτυχώς!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα κατά την αποθήκευση: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            processing = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private string GetMonthName(int month)
+    {
+        var monthNames = new[] { "", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος",
+                                "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος" };
+        return month >= 1 && month <= 12 ? monthNames[month] : month.ToString();
+    }
+}

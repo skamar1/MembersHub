@@ -4,10 +4,12 @@
 @using MembersHub.Core.Interfaces
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using MembersHub.Web.Components.Shared
 @attribute [Authorize(Roles = "Admin,Owner")]
 @inject IEmailConfigurationService EmailConfigService
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IDialogService DialogService
 
 <PageTitle>Ρυθμίσεις Email - MembersHub</PageTitle>
 
@@ -87,6 +89,14 @@
                                   Label="Password Reset Template"
                                   Lines="5"
                                   Class="mb-3" />
+
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Info" 
+                               StartIcon="@Icons.Material.Filled.Preview"
+                               OnClick="ShowTemplatePreview"
+                               Class="mb-3">
+                        Προεπισκόπηση Template
+                    </MudButton>
 
                     <MudGrid>
                         <MudItem xs="6">
@@ -409,6 +419,22 @@
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         return authState.User?.Identity?.Name ?? "System";
+    }
+
+    private async Task ShowTemplatePreview()
+    {
+        var parameters = new DialogParameters
+        {
+            { "CustomTemplate", currentSettings.PasswordResetTemplate }
+        };
+
+        var options = new DialogOptions 
+        { 
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true
+        };
+
+        await DialogService.ShowAsync<EmailTemplatePreview>("Προεπισκόπηση Email Template", parameters, options);
     }
 
     private static string GetDefaultPasswordResetTemplate()

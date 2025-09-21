@@ -12,9 +12,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Aspire service defaults
 builder.AddServiceDefaults();
 
-// Add regular SQL Server DbContext
-builder.Services.AddDbContext<MembersHub.Infrastructure.Data.MembersHubContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("membershubdb")));
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -22,6 +19,9 @@ builder.Services.AddRazorComponents()
 
 // Add MudBlazor services
 builder.Services.AddMudServices();
+
+// Add Infrastructure services
+builder.Services.AddInfrastructure(builder.Configuration);
 
 // Add Application services
 builder.Services.AddApplication();
@@ -49,9 +49,6 @@ builder.Services.AddScoped<CustomAuthenticationStateProvider>(provider =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IHttpContextInfoService, HttpContextInfoService>();
 
-// Add Email services
-builder.Services.AddScoped<MembersHub.Core.Interfaces.IEmailEncryptionService, MembersHub.Infrastructure.Services.EmailEncryptionService>();
-builder.Services.AddScoped<MembersHub.Core.Interfaces.IEmailConfigurationService, MembersHub.Infrastructure.Services.EmailConfigurationService>();
 
 var app = builder.Build();
 
@@ -61,11 +58,35 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = scope.ServiceProvider.GetRequiredService<MembersHub.Infrastructure.Data.MembersHubContext>();
-        await context.Database.MigrateAsync();
-        
-        // Log successful migration
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+        // Apply migrations first
+        await context.Database.MigrateAsync();
         logger.LogInformation("Database migrations applied successfully");
+
+        // Check if this is a fresh database by seeing if admin user has empty password
+        var adminUser = await context.Users.FirstOrDefaultAsync(u => u.Username == "admin");
+        if (adminUser != null && string.IsNullOrEmpty(adminUser.PasswordHash))
+        {
+            // This is a fresh database with seeded data but empty passwords - update them
+            var adminHash = "$2a$11$yH8BxJ0Tff7K9B7N.zPgWOZGxF9z7xKfHhqPzO.X9xQqzjHm5N.Vy"; // Aris100*
+
+            await context.Database.ExecuteSqlRawAsync(@"
+                UPDATE Users SET PasswordHash = {0} WHERE Username = 'admin';
+                UPDATE Users SET PasswordHash = {0} WHERE Username = 'owner';
+                UPDATE Users SET PasswordHash = {0} WHERE Username = 'treasurer';
+            ", adminHash);
+
+            logger.LogInformation("Default user passwords set successfully for fresh database");
+        }
+        else if (adminUser != null)
+        {
+            logger.LogInformation("Users already have passwords - skipping password updates");
+        }
+        else
+        {
+            logger.LogInformation("No users found in database - this may be a completely empty database");
+        }
     }
     catch (Exception ex)
     {

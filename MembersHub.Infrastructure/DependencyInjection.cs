@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 using MembersHub.Core.Interfaces;
 using MembersHub.Infrastructure.Data;
 using MembersHub.Infrastructure.Repositories;
+using MembersHub.Infrastructure.Services;
 
 namespace MembersHub.Infrastructure;
 
@@ -14,10 +16,9 @@ public static class DependencyInjection
         // Add DbContext with SQL Server
         services.AddDbContext<MembersHubContext>(options =>
         {
-            var connectionString = configuration.GetConnectionString("membershubdb") 
-                ?? configuration.GetConnectionString("DefaultConnection")
-                ?? "Server=100.113.99.32,1433;Database=membershubdb;User Id=sa;Password=admin8*;TrustServerCertificate=true;Encrypt=false;";
-            
+            var connectionString = configuration.GetConnectionString("membershubdb")
+                ?? "Server=100.113.99.32\\EXP2022;Database=membershubdb;User Id=sa;Password=admin8*;TrustServerCertificate=true;Encrypt=false;";
+
             options.UseSqlServer(connectionString, sqlServerOptions =>
             {
                 sqlServerOptions.MigrationsAssembly(typeof(MembersHubContext).Assembly.FullName);
@@ -26,6 +27,28 @@ public static class DependencyInjection
 
         // Register generic repository
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+
+        // Register email services
+        services.AddScoped<IEmailEncryptionService, EmailEncryptionService>();
+        services.AddScoped<IEmailConfigurationService, EmailConfigurationService>();
+        
+        // Register password reset services
+        services.AddScoped<IPasswordResetTokenService, PasswordResetTokenService>();
+        services.AddScoped<IRateLimitService, RateLimitService>();
+        services.AddScoped<IEmailNotificationService, EmailNotificationService>();
+        services.AddScoped<IPasswordResetService, PasswordResetService>();
+        
+        // Register security services
+        services.AddHttpClient<IGeolocationService, GeolocationService>();
+        services.AddScoped<IDeviceTrackingService, DeviceTrackingService>();
+        services.AddScoped<ISecurityEventService, SecurityEventService>();
+        services.AddHttpClient<IPasswordSecurityService, PasswordSecurityService>();
+        services.AddScoped<IAccountLockoutService, AccountLockoutService>();
+        services.AddScoped<ISecurityNotificationService, SecurityNotificationService>();
+        services.AddScoped<IAdvancedAuditService, AdvancedAuditService>();
+
+        // Register financial services
+        services.AddScoped<IFinancialService, FinancialService>();
 
         return services;
     }

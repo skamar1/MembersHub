@@ -1,0 +1,343 @@
+@page "/admin/security"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@inject IAdvancedAuditService AdvancedAuditService
+@inject ISecurityEventService SecurityEventService
+@inject IAccountLockoutService AccountLockoutService
+@inject ISecurityNotificationService SecurityNotificationService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@attribute [Authorize(Roles = "Admin,Owner")]
+
+<PageTitle>Admin Security Panel</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-6">🛡️ Admin Security Panel</MudText>
+
+    <!-- Action Buttons -->
+    <MudButtonGroup Variant="Variant.Filled" Class="mb-6">
+        <MudButton Color="Color.Primary" StartIcon="Icons.Material.Filled.Analytics" OnClick="PerformSecurityAnalysis">
+            Run Security Analysis
+        </MudButton>
+        <MudButton Color="Color.Secondary" StartIcon="Icons.Material.Filled.CleaningServices" OnClick="CleanupOldData">
+            Cleanup Old Data
+        </MudButton>
+        <MudButton Color="Color.Info" StartIcon="Icons.Material.Filled.Download" OnClick="ExportAuditLogs">
+            Export Audit Logs
+        </MudButton>
+    </MudButtonGroup>
+
+    <!-- Security Statistics -->
+    <MudGrid Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.Security" Color="Color.Primary" Size="Size.Large" Class="mb-2" />
+                    <MudText Typo="Typo.h4">@statistics.SecurityEvents</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Security Events (30d)</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Large" Class="mb-2" />
+                    <MudText Typo="Typo.h4">@statistics.FailedOperations</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Failed Operations</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.People" Color="Color.Info" Size="Size.Large" Class="mb-2" />
+                    <MudText Typo="Typo.h4">@statistics.UniqueUsers</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Active Users</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="text-center">
+                    <MudIcon Icon="Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Large" Class="mb-2" />
+                    <MudText Typo="Typo.h4">@statistics.TotalActions</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Total Actions</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Tabs for different views -->
+    <MudTabs Elevation="1" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        
+        <!-- Suspicious Activities -->
+        <MudTabPanel Text="Suspicious Activities" Icon="Icons.Material.Filled.Warning">
+            <MudDataGrid T="AuditLog" Items="@suspiciousActivities" Filterable="true" Sortable="true" 
+                         Dense="true" Hover="true" Loading="@loading" Height="400px">
+                <Columns>
+                    <PropertyColumn Property="x => x.Timestamp" Title="Time" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.Username" Title="User" />
+                    <PropertyColumn Property="x => x.Action" Title="Action" />
+                    <PropertyColumn Property="x => x.IpAddress" Title="IP Address" />
+                    <PropertyColumn Property="x => x.Description" Title="Description" />
+                    <TemplateColumn Title="Status">
+                        <CellTemplate>
+                            @if (!string.IsNullOrEmpty(context.Item.ErrorMessage))
+                            {
+                                <MudChip Color="Color.Error" Size="Size.Small">Failed</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip Color="Color.Warning" Size="Size.Small">Suspicious</MudChip>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudTabPanel>
+
+        <!-- Critical Notifications -->
+        <MudTabPanel Text="Critical Notifications" Icon="Icons.Material.Filled.ErrorOutline">
+            <MudDataGrid T="SecurityNotification" Items="@criticalNotifications" Filterable="true" Sortable="true" 
+                         Dense="true" Hover="true" Loading="@loading" Height="400px">
+                <Columns>
+                    <PropertyColumn Property="x => x.CreatedAt" Title="Time" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.User.Username" Title="User" />
+                    <PropertyColumn Property="x => x.Title" Title="Title" />
+                    <PropertyColumn Property="x => x.Severity" Title="Severity" />
+                    <PropertyColumn Property="x => x.Location" Title="Location" />
+                    <TemplateColumn Title="Status">
+                        <CellTemplate>
+                            @if (context.Item.IsRead)
+                            {
+                                <MudChip Color="Color.Success" Size="Size.Small">Read</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip Color="Color.Error" Size="Size.Small">Unread</MudChip>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudTabPanel>
+
+        <!-- Account Lockouts -->
+        <MudTabPanel Text="Account Lockouts" Icon="Icons.Material.Filled.Lock">
+            <MudDataGrid T="AccountLockout" Items="@recentLockouts" Filterable="true" Sortable="true" 
+                         Dense="true" Hover="true" Loading="@loading" Height="400px">
+                <Columns>
+                    <PropertyColumn Property="x => x.User.Username" Title="User" />
+                    <PropertyColumn Property="x => x.FailedAttempts" Title="Failed Attempts" />
+                    <PropertyColumn Property="x => x.LastAttemptAt" Title="Last Attempt" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.LastAttemptIpAddress" Title="IP Address" />
+                    <PropertyColumn Property="x => x.LockedUntil" Title="Locked Until" Format="yyyy-MM-dd HH:mm:ss" />
+                    <TemplateColumn Title="Status">
+                        <CellTemplate>
+                            @if (context.Item.IsLockedOut)
+                            {
+                                <MudChip Color="Color.Error" Size="Size.Small">Locked</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip Color="Color.Success" Size="Size.Small">Active</MudChip>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Actions">
+                        <CellTemplate>
+                            @if (context.Item.IsLockedOut)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                           OnClick="() => UnlockAccount(context.Item.UserId)">
+                                    Unlock
+                                </MudButton>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudTabPanel>
+
+        <!-- Audit Search -->
+        <MudTabPanel Text="Audit Search" Icon="Icons.Material.Filled.Search">
+            <!-- Search Form -->
+            <MudCard Class="mb-4">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudTextField @bind-Value="searchCriteria.Username" Label="Username" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudSelect T="AuditAction?" @bind-Value="searchCriteria.Action" Label="Action">
+                                <MudSelectItem Value="@((AuditAction?)null)">All Actions</MudSelectItem>
+                                @foreach (var action in Enum.GetValues<AuditAction>())
+                                {
+                                    <MudSelectItem Value="@action">@action</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudDatePicker @bind-Date="fromDate" Label="From Date" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudDatePicker @bind-Date="toDate" Label="To Date" />
+                        </MudItem>
+                        <MudItem xs="12" Class="d-flex justify-end">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAuditLogs">
+                                <MudIcon Icon="Icons.Material.Filled.Search" Class="mr-2" />
+                                Search
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Search Results -->
+            <MudDataGrid T="AuditLog" Items="@searchResults" Filterable="false" Sortable="true" 
+                         Dense="true" Hover="true" Loading="@searchLoading" Height="400px">
+                <Columns>
+                    <PropertyColumn Property="x => x.Timestamp" Title="Time" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.Username" Title="User" />
+                    <PropertyColumn Property="x => x.Action" Title="Action" />
+                    <PropertyColumn Property="x => x.EntityType" Title="Entity" />
+                    <PropertyColumn Property="x => x.Description" Title="Description" />
+                    <PropertyColumn Property="x => x.IpAddress" Title="IP Address" />
+                    <TemplateColumn Title="Status">
+                        <CellTemplate>
+                            @if (!string.IsNullOrEmpty(context.Item.ErrorMessage))
+                            {
+                                <MudChip Color="Color.Error" Size="Size.Small">Failed</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip Color="Color.Success" Size="Size.Small">Success</MudChip>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudTabPanel>
+
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private bool loading = true;
+    private bool searchLoading = false;
+    private AuditStatistics statistics = new();
+    private List<AuditLog> suspiciousActivities = new();
+    private List<SecurityNotification> criticalNotifications = new();
+    private List<AccountLockout> recentLockouts = new();
+    private List<AuditLog> searchResults = new();
+    
+    private AuditSearchCriteria searchCriteria = new();
+    private DateTime? fromDate;
+    private DateTime? toDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        loading = true;
+        try
+        {
+            // Load statistics
+            statistics = await AdvancedAuditService.GetAuditStatisticsAsync(30);
+            
+            // Load suspicious activities
+            suspiciousActivities = await AdvancedAuditService.GetSuspiciousActivitiesAsync(7);
+            
+            // Load critical notifications
+            criticalNotifications = await SecurityNotificationService.GetCriticalNotificationsAsync(24);
+            
+            // Load account lockouts
+            recentLockouts = await AccountLockoutService.GetRecentLockoutsAsync(7);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task SearchAuditLogs()
+    {
+        searchLoading = true;
+        try
+        {
+            searchCriteria.FromDate = fromDate;
+            searchCriteria.ToDate = toDate;
+            searchResults = await AdvancedAuditService.SearchAuditLogsAsync(searchCriteria);
+        }
+        finally
+        {
+            searchLoading = false;
+        }
+    }
+
+    private async Task PerformSecurityAnalysis()
+    {
+        try
+        {
+            await AdvancedAuditService.PerformSecurityAnalysisAsync();
+            await LoadDashboardData();
+            Snackbar.Add("Security analysis completed successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Security analysis failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CleanupOldData()
+    {
+        try
+        {
+            await AdvancedAuditService.CleanupOldAuditLogsAsync(365);
+            await SecurityEventService.CleanupOldEventsAsync(365);
+            await SecurityNotificationService.DeleteOldNotificationsAsync(90);
+            
+            Snackbar.Add("Old data cleanup completed successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Cleanup failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ExportAuditLogs()
+    {
+        try
+        {
+            var exportRequest = new AuditExportRequest
+            {
+                Criteria = new AuditSearchCriteria 
+                {
+                    FromDate = DateTime.UtcNow.AddDays(-30),
+                    ToDate = DateTime.UtcNow,
+                    Take = 1000
+                },
+                Format = ExportFormat.Csv,
+                FilePath = "/tmp/audit_export.csv"
+            };
+
+            await AdvancedAuditService.ExportAuditLogsAsync(exportRequest);
+            Snackbar.Add("Audit logs exported successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task UnlockAccount(int userId)
+    {
+        await AccountLockoutService.UnlockAccountAsync(userId);
+        await LoadDashboardData();
+        Snackbar.Add("Account unlocked successfully", Severity.Success);
+    }
+}

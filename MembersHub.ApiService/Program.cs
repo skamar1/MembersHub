@@ -5,6 +5,8 @@ using System.Text;
 using MembersHub.Core.Interfaces;
 using MembersHub.Application.Services;
 using MembersHub.Infrastructure.Data;
+using MembersHub.Infrastructure;
+using MembersHub.Application;
 using MembersHub.ApiService.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,18 +15,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-// Add Entity Framework
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "Server=(localdb)\\mssqllocaldb;Database=MembersHubDb;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true";
+// Add Infrastructure and Application services
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddApplication();
 
-builder.Services.AddDbContext<MembersHubContext>(options =>
-    options.UseSqlServer(connectionString));
-
-// Add custom services
+// Add API-specific services
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
-builder.Services.AddScoped<IMemberService, MemberService>();
-builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<ISessionService, ApiSessionService>();
 builder.Services.AddScoped<IHttpContextInfoService, ApiHttpContextInfoService>();
 

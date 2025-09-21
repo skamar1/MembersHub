@@ -1,0 +1,202 @@
+@page "/security/notifications"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@inject ISecurityNotificationService SecurityNotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+@attribute [Authorize]
+
+<PageTitle>Security Notifications</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <MudText Typo="Typo.h4">🔔 Security Notifications</MudText>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            @if (unreadCount > 0)
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="MarkAllAsRead">
+                    Mark All as Read (@unreadCount)
+                </MudButton>
+            }
+            <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="RefreshNotifications">
+                <MudIcon Icon="Icons.Material.Filled.Refresh" Class="mr-2" />
+                Refresh
+            </MudButton>
+        </div>
+    </div>
+
+    @if (unreadCount > 0)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            You have <strong>@unreadCount</strong> unread security notifications.
+        </MudAlert>
+    }
+
+    <!-- Filter Tabs -->
+    <MudTabs Elevation="1" ApplyEffectsToContainer="true" Class="mb-4">
+        <MudTabPanel Text="All" Icon="Icons.Material.Filled.List">
+            @{ var allNotifications = notifications; }
+            @RenderNotifications(allNotifications)
+        </MudTabPanel>
+        <MudTabPanel Text="Unread" Icon="Icons.Material.Filled.MarkunreadMailbox">
+            @{ var unreadNotifications = notifications.Where(n => !n.IsRead).ToList(); }
+            @RenderNotifications(unreadNotifications)
+        </MudTabPanel>
+        <MudTabPanel Text="Critical" Icon="Icons.Material.Filled.Warning">
+            @{ var criticalNotifications = notifications.Where(n => n.Severity >= SecurityNotificationSeverity.High).ToList(); }
+            @RenderNotifications(criticalNotifications)
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private bool loading = true;
+    private int currentUserId;
+    private int unreadCount = 0;
+    private List<SecurityNotification> notifications = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+            {
+                currentUserId = userId;
+                await LoadNotifications();
+            }
+        }
+    }
+
+    private async Task LoadNotifications()
+    {
+        loading = true;
+        try
+        {
+            notifications = await SecurityNotificationService.GetUserNotificationsAsync(currentUserId, false, 50);
+            unreadCount = await SecurityNotificationService.GetUnreadCountAsync(currentUserId);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task RefreshNotifications()
+    {
+        await LoadNotifications();
+        Snackbar.Add("Notifications refreshed", Severity.Success);
+    }
+
+    private async Task HandleMarkAsRead(int notificationId)
+    {
+        await SecurityNotificationService.MarkAsReadAsync(notificationId);
+        await LoadNotifications();
+        Snackbar.Add("Notification marked as read", Severity.Success);
+    }
+
+    private async Task MarkAllAsRead()
+    {
+        await SecurityNotificationService.MarkAllAsReadAsync(currentUserId);
+        await LoadNotifications();
+        Snackbar.Add("All notifications marked as read", Severity.Success);
+    }
+
+    private RenderFragment RenderNotifications(List<SecurityNotification> notificationList) => __builder =>
+    {
+        if (notificationList.Any())
+        {
+            <MudStack Spacing="3">
+                @foreach (var notification in notificationList.OrderByDescending(n => n.CreatedAt))
+                {
+                    <MudCard Elevation="2" Class="@(notification.IsRead ? "opacity-60" : "")">
+                        <MudCardContent>
+                            <!-- Notification header -->
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <!-- Severity badge -->
+                                    <MudChip T="string" Color="@GetSeverityColor(notification.Severity)" Size="Size.Small" 
+                                             Icon="@GetSeverityIcon(notification.Severity)">
+                                        @notification.Severity.ToString()
+                                    </MudChip>
+                                    
+                                    <!-- Title -->
+                                    <MudText Typo="Typo.h6">@notification.Title</MudText>
+                                </div>
+                                
+                                <!-- Actions -->
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    @if (!notification.IsRead)
+                                    {
+                                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                                   OnClick="() => HandleMarkAsRead(notification.Id)">
+                                            <MudIcon Icon="Icons.Material.Filled.Done" Size="Size.Small" Class="mr-1" />
+                                            Mark as Read
+                                        </MudButton>
+                                    }
+                                </div>
+                            </div>
+                            
+                            <!-- Message -->
+                            <MudText Typo="Typo.body2" Class="mb-3">@notification.Message</MudText>
+                            
+                            <!-- Metadata -->
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @notification.CreatedAt.ToString("MMM dd, yyyy HH:mm:ss")
+                                    @if (!string.IsNullOrEmpty(notification.Location))
+                                    {
+                                        <text> • @notification.Location</text>
+                                    }
+                                </MudText>
+                                
+                                @if (notification.EmailSent)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="Icons.Material.Filled.Email">
+                                        Email Sent
+                                    </MudChip>
+                                }
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudStack>
+        }
+        else
+        {
+            <div style="text-align: center; padding: 40px;">
+                <MudIcon Icon="Icons.Material.Filled.Notifications" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-4">No notifications</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Security notifications will appear here.</MudText>
+            </div>
+        }
+    };
+
+    private static Color GetSeverityColor(SecurityNotificationSeverity severity)
+    {
+        return severity switch
+        {
+            SecurityNotificationSeverity.Critical => Color.Error,
+            SecurityNotificationSeverity.High => Color.Warning,
+            SecurityNotificationSeverity.Medium => Color.Info,
+            SecurityNotificationSeverity.Low => Color.Primary,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetSeverityIcon(SecurityNotificationSeverity severity)
+    {
+        return severity switch
+        {
+            SecurityNotificationSeverity.Critical => Icons.Material.Filled.Error,
+            SecurityNotificationSeverity.High => Icons.Material.Filled.Warning,
+            SecurityNotificationSeverity.Medium => Icons.Material.Filled.Info,
+            SecurityNotificationSeverity.Low => Icons.Material.Filled.Notifications,
+            _ => Icons.Material.Filled.Circle
+        };
+    }
+}

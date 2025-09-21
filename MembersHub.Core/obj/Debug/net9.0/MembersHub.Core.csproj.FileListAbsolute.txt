@@ -6,6 +6,7 @@
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.AssemblyInfoInputs.cache
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.AssemblyInfo.cs
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.csproj.CoreCompileInputs.cache
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.sourcelink.json
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.dll
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/refint/MembersHub.Core.dll
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.Core/obj/Debug/net9.0/MembersHub.Core.pdb
