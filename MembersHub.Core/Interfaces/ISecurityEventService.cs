@@ -15,7 +15,7 @@ public interface ISecurityEventService
 
 public class SecurityEventRequest
 {
-    public int UserId { get; set; }
+    public int? UserId { get; set; }
     public SecurityEventType EventType { get; set; }
     public string IpAddress { get; set; } = string.Empty;
     public string? UserAgent { get; set; }

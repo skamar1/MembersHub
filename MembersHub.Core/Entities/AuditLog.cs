@@ -67,5 +67,9 @@ public enum AuditAction
     Import = 61,
     Backup = 62,
     SystemAccess = 70,
-    UnauthorizedAccess = 71
+    UnauthorizedAccess = 71,
+
+    // Security Actions
+    AccountLockout = 80,
+    AccountUnlock = 81
 }

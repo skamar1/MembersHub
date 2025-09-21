@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using MudBlazor
 @using MembersHub.Web.Components.Shared
+@using MembersHub.Shared.Utilities
 @attribute [Authorize]
 
 <PageTitle>Αρχική - MembersHub</PageTitle>
@@ -16,7 +17,7 @@
                         Καλώς ήρθατε στο MembersHub
                     </MudText>
                     <MudText Typo="Typo.h6" Align="Align.Center" Class="mt-2 mb-6">
-                        Γεια σου, @context.User.FindFirst("FullName")?.Value!
+                        Γεια σου, @GreekNameUtils.ProcessGreekFullName(context.User.FindFirst("FullName")?.Value ?? "")!
                     </MudText>
                 </MudItem>
                 

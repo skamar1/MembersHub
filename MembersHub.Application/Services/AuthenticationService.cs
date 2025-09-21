@@ -57,8 +57,8 @@ public class AuthenticationService : IAuthenticationService
             {
                 _logger.LogWarning("Authentication failed: User '{Username}' not found or inactive from IP {IpAddress}", username, ipAddress);
                 
-                // Log failed security event for non-existent user
-                await LogSecurityEventAsync(0, SecurityEventType.LoginFailure, ipAddress, userAgent, false);
+                // Log failed security event for non-existent user (without userId)
+                await LogAnonymousSecurityEventAsync(SecurityEventType.LoginFailure, ipAddress, userAgent, false);
                 
                 return new AuthenticationResult 
                 { 
@@ -227,6 +227,20 @@ public class AuthenticationService : IAuthenticationService
         var request = new SecurityEventRequest
         {
             UserId = userId,
+            EventType = eventType,
+            IpAddress = ipAddress,
+            UserAgent = userAgent,
+            IsSuccessful = isSuccessful
+        };
+
+        await _securityEventService.LogSecurityEventAsync(request);
+    }
+
+    public async Task LogAnonymousSecurityEventAsync(SecurityEventType eventType, string ipAddress, string? userAgent = null, bool isSuccessful = true)
+    {
+        var request = new SecurityEventRequest
+        {
+            UserId = null, // No user ID for anonymous events
             EventType = eventType,
             IpAddress = ipAddress,
             UserAgent = userAgent,

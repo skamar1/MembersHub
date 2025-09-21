@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using MembersHub.Core.Interfaces
 @using MembersHub.Web.Services
+@using MembersHub.Shared.Utilities
 @inject ISessionService SessionService
 @inject CustomAuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
@@ -10,37 +11,40 @@
 @inject IAuditService AuditService
 @inject IHttpContextInfoService HttpContextInfo
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <AuthorizeView>
-                <Authorized>
-                    <div class="d-flex align-center gap-3">
-                        <MudText>Καλώς ήρθατε, @context.User.FindFirst("FullName")?.Value!</MudText>
-                        <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="Logout">
-                            <MudIcon Icon="@Icons.Material.Filled.Logout" Class="mr-1" />
-                            Αποσύνδεση
-                        </MudButton>
-                    </div>
-                </Authorized>
-                <NotAuthorized>
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="GoToLogin">
-                        <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-1" />
-                        Σύνδεση
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
+        <MudText Typo="Typo.h5" Class="ml-3">MembersHub</MudText>
+        <MudSpacer />
+        <AuthorizeView>
+            <Authorized>
+                <div class="d-flex align-center gap-2">
+                    <MudText Class="d-none d-sm-flex">Καλώς ήρθατε, @GreekNameUtils.ProcessGreekFullName(context.User.FindFirst("FullName")?.Value ?? "")!</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="Logout" Size="Size.Small">
+                        <MudIcon Icon="@Icons.Material.Filled.Logout" Class="mr-1" />
+                        <span class="d-none d-sm-inline">Αποσύνδεση</span>
                     </MudButton>
-                </NotAuthorized>
-            </AuthorizeView>
-        </div>
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="GoToLogin">
+                    <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-1" />
+                    Σύνδεση
+                </MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
+    </MudAppBar>
 
-        <article class="content px-4">
+    <MudDrawer @bind-Open="@drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2" Variant="@DrawerVariant.Responsive" Breakpoint="@Breakpoint.Md">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="pt-4">
             @Body
-        </article>
-    </main>
-</div>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -49,18 +53,25 @@
 </div>
 
 @code {
+    private bool drawerOpen = false;
+
+    private void ToggleDrawer()
+    {
+        drawerOpen = !drawerOpen;
+    }
+
     private async Task Logout()
     {
         // Get current user info before logout
         var currentUser = await SessionService.GetCurrentUserAsync();
-        
+
         if (currentUser != null)
         {
             // Log the logout
-            await AuditService.LogLogoutAsync(currentUser.Id, currentUser.Username, currentUser.FullName, 
+            await AuditService.LogLogoutAsync(currentUser.Id, currentUser.Username, currentUser.FullName,
                 HttpContextInfo.GetIpAddress());
         }
-        
+
         await AuthStateProvider.MarkUserAsLoggedOut();
         Snackbar.Add("Αποσυνδεθήκατε επιτυχώς", Severity.Info);
         Navigation.NavigateTo("/login", replace: true);

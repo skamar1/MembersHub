@@ -9,8 +9,7 @@ public class SecurityEvent
     [Key]
     public int Id { get; set; }
     
-    [Required]
-    public int UserId { get; set; }
+    public int? UserId { get; set; }
     
     [Required]
     [StringLength(50)]
@@ -58,7 +57,7 @@ public class SecurityEvent
     
     // Navigation properties
     [ForeignKey(nameof(UserId))]
-    public virtual User User { get; set; } = null!;
+    public virtual User? User { get; set; }
 }
 
 public enum SecurityEventType

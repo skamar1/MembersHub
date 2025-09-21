@@ -333,7 +333,7 @@ public class PaymentService : IPaymentService
 
                 <div class='receipt-info'>
                     <p><strong>Αριθμός Απόδειξης:</strong> {payment.ReceiptNumber}</p>
-                    <p><strong>Ημερομηνία:</strong> {payment.PaymentDate:dd/MM/yyyy HH:mm}</p>
+                    <p><strong>Ημερομηνία:</strong> {payment.CreatedAt:dd/MM/yyyy HH:mm}</p>
                     <p><strong>Μέλος:</strong> {payment.Member.FirstName} {payment.Member.LastName}</p>
                     <p><strong>Αριθμός Μέλους:</strong> {payment.Member.MemberNumber}</p>
                     {(payment.Collector != null ? $"<p><strong>Εισπράκτορας:</strong> {payment.Collector.FirstName} {payment.Collector.LastName}</p>" : "")}
@@ -363,7 +363,7 @@ public class PaymentService : IPaymentService
             <h4>Στοιχεία Πληρωμής:</h4>
             <ul>
                 <li><strong>Αριθμός Απόδειξης:</strong> {payment.ReceiptNumber}</li>
-                <li><strong>Ημερομηνία:</strong> {payment.PaymentDate:dd/MM/yyyy HH:mm}</li>
+                <li><strong>Ημερομηνία:</strong> {payment.CreatedAt:dd/MM/yyyy HH:mm}</li>
                 <li><strong>Ποσό:</strong> €{payment.Amount:N2}</li>
                 <li><strong>Τρόπος Πληρωμής:</strong> {payment.PaymentMethod}</li>
                 {(!string.IsNullOrEmpty(payment.Notes) ? $"<li><strong>Σημειώσεις:</strong> {payment.Notes}</li>" : "")}

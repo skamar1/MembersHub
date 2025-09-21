@@ -4,6 +4,7 @@ using MembersHub.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Reflection;
 
 namespace MembersHub.Application.Services;
@@ -27,6 +28,17 @@ public class AuditService : IAuditService
     {
         try
         {
+            // If userId is provided, verify that the user exists in the database
+            if (userId.HasValue)
+            {
+                var userExists = await _context.Users.AnyAsync(u => u.Id == userId.Value);
+                if (!userExists)
+                {
+                    _logger.LogWarning("Attempted to log audit entry for non-existent user ID {UserId}. Setting UserId to null.", userId);
+                    userId = null;
+                }
+            }
+
             var auditLog = new AuditLog
             {
                 UserId = userId,
@@ -276,15 +288,19 @@ public class AuditService : IAuditService
     {
         try
         {
-            return JsonSerializer.Serialize(entity, new JsonSerializerOptions 
-            { 
+            return JsonSerializer.Serialize(entity, new JsonSerializerOptions
+            {
                 WriteIndented = false,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                ReferenceHandler = ReferenceHandler.IgnoreCycles,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             });
         }
-        catch
+        catch (Exception ex)
         {
+            // Log the exception for debugging
+            System.Diagnostics.Debug.WriteLine($"Failed to serialize entity {typeof(T).Name}: {ex.Message}");
             return entity.ToString() ?? "";
         }
     }

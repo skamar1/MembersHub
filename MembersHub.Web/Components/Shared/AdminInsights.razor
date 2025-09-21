@@ -4,7 +4,7 @@
 @using Microsoft.EntityFrameworkCore
 @using MudBlazor
 @attribute [Authorize(Roles = "Admin,Owner")]
-@inject MembersHubContext Context
+@inject IDbContextFactory<MembersHubContext> ContextFactory
 @rendermode InteractiveServer
 
 <MudGrid>
@@ -132,10 +132,11 @@
     {
         try
         {
+            using var context = ContextFactory.CreateDbContext();
             var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
-            
+
             // Load recent password resets
-            recentPasswordResets = await Context.PasswordResetTokens
+            recentPasswordResets = await context.PasswordResetTokens
                 .Include(p => p.User)
                 .Where(p => p.CreatedAt >= sevenDaysAgo)
                 .OrderByDescending(p => p.CreatedAt)
@@ -143,7 +144,7 @@
 
             // Load rate limit statistics
             var yesterday = DateTime.UtcNow.AddDays(-1);
-            rateLimitStats = await Context.PasswordResetRateLimits
+            rateLimitStats = await context.PasswordResetRateLimits
                 .Where(r => r.LastAttemptAt >= yesterday)
                 .OrderByDescending(r => r.AttemptCount)
                 .ThenByDescending(r => r.LastAttemptAt)
@@ -163,17 +164,18 @@
         isClearing = true;
         try
         {
+            using var context = ContextFactory.CreateDbContext();
             var cutoffTime = DateTime.UtcNow.AddHours(-2); // Keep records for 2 hours
-            
-            var oldRecords = await Context.PasswordResetRateLimits
+
+            var oldRecords = await context.PasswordResetRateLimits
                 .Where(r => r.WindowStartAt < cutoffTime)
                 .ToListAsync();
-                
+
             if (oldRecords.Any())
             {
-                Context.PasswordResetRateLimits.RemoveRange(oldRecords);
-                await Context.SaveChangesAsync();
-                
+                context.PasswordResetRateLimits.RemoveRange(oldRecords);
+                await context.SaveChangesAsync();
+
                 // Reload the data
                 await LoadInsights();
             }

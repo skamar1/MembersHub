@@ -12,6 +12,7 @@ public interface IAuthenticationService
     Task LogoutAsync(string token);
     Task<SecurityRiskAssessment> AssessLoginRiskAsync(int userId, string ipAddress, string? userAgent = null);
     Task LogSecurityEventAsync(int userId, SecurityEventType eventType, string ipAddress, string? userAgent = null, bool isSuccessful = true);
+    Task LogAnonymousSecurityEventAsync(SecurityEventType eventType, string ipAddress, string? userAgent = null, bool isSuccessful = true);
 }
 
 public class AuthenticationResult

@@ -30,9 +30,20 @@ public class SecurityEventService : ISecurityEventService
     {
         try
         {
+            // Validate that the user exists before creating the security event
+            if (request.UserId.HasValue)
+            {
+                var userExists = await _context.Users.AnyAsync(u => u.Id == request.UserId.Value);
+                if (!userExists)
+                {
+                    _logger.LogWarning("Attempted to log security event for non-existent user ID {UserId}. Skipping security event creation.", request.UserId);
+                    return;
+                }
+            }
+
             var locationInfo = await _geolocationService.GetLocationAsync(request.IpAddress);
-            var deviceInfo = !string.IsNullOrEmpty(request.UserAgent) 
-                ? await _deviceTrackingService.ParseDeviceInfoAsync(request.UserAgent) 
+            var deviceInfo = !string.IsNullOrEmpty(request.UserAgent)
+                ? await _deviceTrackingService.ParseDeviceInfoAsync(request.UserAgent)
                 : null;
 
             var securityEvent = new SecurityEvent

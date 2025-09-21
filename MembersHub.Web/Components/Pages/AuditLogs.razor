@@ -22,16 +22,16 @@
         <MudGrid Class="mb-4">
             <MudItem xs="12" sm="6" md="3">
                 <MudSelect T="AuditAction?" @bind-Value="selectedAction" Label="Ενέργεια" Variant="Variant.Outlined" Clearable="true">
-                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)null)">Όλες</MudSelectItem>
-                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.Login)">Σύνδεση</MudSelectItem>
-                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.Logout)">Αποσύνδεση</MudSelectItem>
-                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.LoginFailed)">Αποτυχημένη Σύνδεση</MudSelectItem>
-                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.MemberCreate)">Δημιουργία Μέλους</MudSelectItem>
-                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.MemberUpdate)">Ενημέρωση Μέλους</MudSelectItem>
-                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.MemberDelete)">Διαγραφή Μέλους</MudSelectItem>
-                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.UserCreate)">Δημιουργία Χρήστη</MudSelectItem>
-                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.UserUpdate)">Ενημέρωση Χρήστη</MudSelectItem>
-                    <MudSelectItem T="AuditAction?" Value="@((AuditAction?)AuditAction.UserDelete)">Διαγραφή Χρήστη</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@null">Όλες</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@AuditAction.Login">Σύνδεση</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@AuditAction.Logout">Αποσύνδεση</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@AuditAction.LoginFailed">Αποτυχημένη Σύνδεση</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@AuditAction.MemberCreate">Δημιουργία Μέλους</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@AuditAction.MemberUpdate">Ενημέρωση Μέλους</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@AuditAction.MemberDelete">Διαγραφή Μέλους</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@AuditAction.UserCreate">Δημιουργία Χρήστη</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@AuditAction.UserUpdate">Ενημέρωση Χρήστη</MudSelectItem>
+                    <MudSelectItem T="AuditAction?" Value="@AuditAction.UserDelete">Διαγραφή Χρήστη</MudSelectItem>
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">

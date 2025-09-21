@@ -28,7 +28,7 @@
             <CardHeaderActions>
                 <MudIconButton Icon="@Icons.Material.Filled.Close"
                                Color="Color.Default"
-                               OnClick="@(() => Navigation.NavigateTo("/payments"))"
+                               OnClick="@(() => Navigation.NavigateTo("/financial/payments"))"
                                Title="Κλείσιμο" />
             </CardHeaderActions>
         </MudCardHeader>
@@ -319,6 +319,9 @@
 </MudContainer>
 
 @code {
+    [SupplyParameterFromQuery]
+    public int? MemberId { get; set; }
+
     private MudForm form = null!;
     private bool formIsValid;
     private string[] errors = Array.Empty<string>();
@@ -340,6 +343,30 @@
         };
 
         await LoadRecentPayments();
+
+        // If MemberId is provided, pre-select the member
+        if (MemberId.HasValue)
+        {
+            await PreSelectMember(MemberId.Value);
+        }
+    }
+
+    private async Task PreSelectMember(int memberId)
+    {
+        try
+        {
+            var members = await MemberService.SearchAsync("");
+            selectedMember = members.FirstOrDefault(m => m.Id == memberId);
+
+            if (selectedMember != null)
+            {
+                await LoadMemberSubscriptions();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης μέλους: {ex.Message}", Severity.Warning);
+        }
     }
 
     private async Task LoadRecentPayments()
@@ -477,7 +504,7 @@
             }
             else
             {
-                Navigation.NavigateTo("/payments");
+                Navigation.NavigateTo("/financial/payments");
             }
         }
         catch (Exception ex)
@@ -504,7 +531,7 @@
         }
     }
 
-    private void Cancel() => Navigation.NavigateTo("/payments");
+    private void Cancel() => Navigation.NavigateTo("/financial/payments");
 
     private static Color GetMemberStatusColor(MemberStatus status) => status switch
     {

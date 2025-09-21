@@ -1,20 +1,73 @@
 @using MudBlazor
 @using Microsoft.AspNetCore.Components.Authorization
 
-<div class="nav-header pa-4">
-    <div class="d-flex align-center gap-3">
-        <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Large" Color="Color.Primary" />
-        <div>
-            <MudText Typo="Typo.h6" Color="Color.Primary">MembersHub</MudText>
-            <MudText Typo="Typo.caption" Color="Color.Secondary">Σύστημα Διαχείρισης</MudText>
-        </div>
-    </div>
-</div>
+<style>
+    /* Mobile-friendly navigation styles */
+    .cashier-quick-access {
+        background: linear-gradient(135deg, var(--mud-palette-success), var(--mud-palette-success-lighten));
+        border-radius: 8px;
+        margin: 8px;
+        padding: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
 
-<MudDivider Class="my-2" />
+    .cashier-quick-access .mud-nav-link {
+        border-radius: 6px;
+        margin: 4px 0;
+        background-color: rgba(255, 255, 255, 0.15);
+        color: white !important;
+        font-weight: 500;
+    }
+
+    .cashier-quick-access .mud-nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.25);
+        transform: translateY(-1px);
+        transition: all 0.2s ease;
+    }
+
+    .quick-access-title {
+        color: white !important;
+        font-weight: 600;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    /* Improved mobile spacing */
+    .mud-nav-group {
+        margin-bottom: 4px;
+    }
+
+    .mud-nav-group .mud-nav-group-header {
+        min-height: 40px;
+        padding: 8px 16px;
+    }
+
+    .mud-nav-link {
+        min-height: 40px;
+        padding: 8px 16px;
+    }
+</style>
 
 <AuthorizeView>
     <Authorized>
+        <!-- Quick Access for Cashiers -->
+        <div class="cashier-quick-access">
+            <MudText Typo="Typo.subtitle2" Class="mb-3 quick-access-title">
+                <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" Class="mr-1" />
+                Γρήγορη Πρόσβαση
+            </MudText>
+            <MudNavLink Href="/payments/new" Icon="@Icons.Material.Filled.AddCard">
+                🚀 Νέα Πληρωμή
+            </MudNavLink>
+            <MudNavLink Href="/financial/payments" Icon="@Icons.Material.Filled.Payment">
+                💰 Πληρωμές Σήμερα
+            </MudNavLink>
+            <MudNavLink Href="/members" Icon="@Icons.Material.Filled.Search">
+                🔍 Αναζήτηση Μέλους
+            </MudNavLink>
+        </div>
+
+        <MudDivider Class="my-3" />
+
         <MudNavMenu>
             <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
                 Αρχική
@@ -25,7 +78,7 @@
             </MudNavLink>
 
             <!-- Financial Section -->
-            <MudNavGroup Expanded="false">
+            <MudNavGroup Expanded="false" MaxHeight="300">
                 <TitleContent>
                     <div style="display: flex; align-items: center;">
                         <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Style="margin-right: 8px;" />
@@ -63,7 +116,7 @@
             </MudNavGroup>
 
             <!-- Security Section -->
-            <MudNavGroup Expanded="false">
+            <MudNavGroup Expanded="false" MaxHeight="200">
                 <TitleContent>
                     <div style="display: flex; align-items: center;">
                         <MudIcon Icon="@Icons.Material.Filled.Security" Style="margin-right: 8px;" />
@@ -83,7 +136,7 @@
             <AuthorizeView Roles="Admin,Owner" Context="adminContext">
                 <Authorized>
                     <!-- Admin Navigation Group -->
-                    <MudNavGroup Expanded="false">
+                    <MudNavGroup Expanded="false" MaxHeight="250">
                         <TitleContent>
                             <div style="display: flex; align-items: center;">
                                 <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Style="margin-right: 8px;" />
@@ -107,7 +160,7 @@
                     </MudNavGroup>
                     
                     <!-- Admin Security Group -->
-                    <MudNavGroup Expanded="false">
+                    <MudNavGroup Expanded="false" MaxHeight="150">
                         <TitleContent>
                             <div style="display: flex; align-items: center;">
                                 <MudIcon Icon="@Icons.Material.Filled.Shield" Style="margin-right: 8px;" />

@@ -2,7 +2,7 @@
 @using MembersHub.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
 @using MudBlazor
-@inject MembersHubContext Context
+@inject IDbContextFactory<MembersHubContext> ContextFactory
 @inject IEmailConfigurationService EmailConfigService
 @rendermode InteractiveServer
 
@@ -64,15 +64,17 @@
     {
         try
         {
+            using var context = ContextFactory.CreateDbContext();
+
             // Load member count
-            totalMembers = await Context.Members.CountAsync();
+            totalMembers = await context.Members.CountAsync();
 
             // Load active user count
-            activeUsers = await Context.Users.CountAsync(u => u.IsActive);
+            activeUsers = await context.Users.CountAsync(u => u.IsActive);
 
             // Load recent actions count (last 24 hours)
             var yesterday = DateTime.UtcNow.AddDays(-1);
-            recentActions = await Context.AuditLogs.CountAsync(a => a.Timestamp >= yesterday);
+            recentActions = await context.AuditLogs.CountAsync(a => a.Timestamp >= yesterday);
 
             // Check email configuration status
             var emailSettings = await EmailConfigService.GetActiveEmailSettingsAsync();

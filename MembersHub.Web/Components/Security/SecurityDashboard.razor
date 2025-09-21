@@ -4,7 +4,7 @@
 @using MembersHub.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Authorization
-@inject MembersHubContext Context
+@inject IDbContextFactory<MembersHubContext> ContextFactory
 @inject ISecurityEventService SecurityEventService
 @inject IAccountLockoutService AccountLockoutService
 @inject IAdvancedAuditService AdvancedAuditService
@@ -202,20 +202,21 @@
 
     private async Task LoadStatistics()
     {
+        using var context = ContextFactory.CreateDbContext();
         var yesterday = DateTime.UtcNow.AddDays(-1);
-        
+
         // Recent login attempts (last 24 hours)
-        var auditLogs = await Context.AuditLogs
+        var auditLogs = await context.AuditLogs
             .Where(a => a.Timestamp >= yesterday && a.Action == AuditAction.Login)
             .ToListAsync();
-            
+
         recentLogins = auditLogs.Count;
         failedAttempts = auditLogs.Count(a => a.ErrorMessage != null);
-        
+
         // Locked accounts
-        lockedAccounts = await Context.AccountLockouts
+        lockedAccounts = await context.AccountLockouts
             .CountAsync(a => a.LockedUntil.HasValue && a.LockedUntil > DateTime.UtcNow);
-        
+
         // Suspicious activities
         var suspiciousEvents = await SecurityEventService.GetSuspiciousEventsAsync(1);
         suspiciousActivities = suspiciousEvents.Count;

@@ -3,6 +3,7 @@
 @using MudBlazor
 @using MembersHub.Core.Interfaces
 @using MembersHub.Web.Services
+@using MembersHub.Shared.Utilities
 @using Microsoft.AspNetCore.Components.Authorization
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
@@ -190,7 +191,7 @@
                 var token = await AuthService.GenerateJwtTokenAsync(result.User);
                 await AuthStateProvider.MarkUserAsAuthenticated(result.User, token);
                 
-                Snackbar.Add($"Καλώς ήρθατε, {result.User.FullName}!", Severity.Success);
+                Snackbar.Add($"Καλώς ήρθατε, {GreekNameUtils.ProcessGreekFullName(result.User.FullName)}!", Severity.Success);
                 Navigation.NavigateTo("/", replace: true);
             }
             else
