@@ -1,11 +1,14 @@
-# fly.toml app configuration file generated for membershub-api
-# API Service with autoscaling
+# fly.toml app configuration file generated for membershub-api on 2025-11-01T19:52:58+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
 app = 'membershub-api'
-primary_region = 'ams'  # Amsterdam - closest to Greece
+primary_region = 'ams'
 
 [build]
   dockerfile = 'Dockerfile'
+  build-target = 'final'
 
 [deploy]
   strategy = 'rolling'
@@ -16,9 +19,9 @@ primary_region = 'ams'  # Amsterdam - closest to Greece
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = true   # Can scale to zero for cost savings
+  auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 0    # Scale to zero in dev, set to 1 for production
+  min_machines_running = 0
 
   [http_service.concurrency]
     type = 'requests'

@@ -125,4 +125,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Health check endpoint for Fly.io
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+
 app.Run();
