@@ -12,6 +12,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Aspire service defaults
 builder.AddServiceDefaults();
 
+// Add Redis distributed caching
+builder.AddRedisDistributedCache("cache");
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -20,7 +22,7 @@ builder.Services.AddRazorComponents()
 // Add MudBlazor services
 builder.Services.AddMudServices();
 
-// Add Infrastructure services
+// Add Infrastructure services (without DbContext - handled by Aspire above)
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // Add Application services
@@ -64,24 +66,40 @@ using (var scope = app.Services.CreateScope())
         await context.Database.MigrateAsync();
         logger.LogInformation("Database migrations applied successfully");
 
-        // Check if this is a fresh database by seeing if admin user has empty password
+        // Check if this is a fresh database or has old incorrect hashes
         var adminUser = await context.Users.FirstOrDefaultAsync(u => u.Username == "admin");
-        if (adminUser != null && string.IsNullOrEmpty(adminUser.PasswordHash))
-        {
-            // This is a fresh database with seeded data but empty passwords - update them
-            var adminHash = "$2a$11$yH8BxJ0Tff7K9B7N.zPgWOZGxF9z7xKfHhqPzO.X9xQqzjHm5N.Vy"; // Aris100*
+        var correctHash = "$2a$11$Oc/hGN4tb2JwuShFyQIDDuCg6b8loRTxHA1Qi.jL3gyZTWCPZ2fcK"; // Aris100*
+        var oldIncorrectHash = "$2a$11$yH8BxJ0Tff7K9B7N.zPgWOZ"; // Prefix of old incorrect hash
 
-            await context.Database.ExecuteSqlRawAsync(@"
-                UPDATE Users SET PasswordHash = {0} WHERE Username = 'admin';
-                UPDATE Users SET PasswordHash = {0} WHERE Username = 'owner';
-                UPDATE Users SET PasswordHash = {0} WHERE Username = 'treasurer';
-            ", adminHash);
-
-            logger.LogInformation("Default user passwords set successfully for fresh database");
-        }
-        else if (adminUser != null)
+        if (adminUser != null)
         {
-            logger.LogInformation("Users already have passwords - skipping password updates");
+            // Fix if password is empty or has the old incorrect hash
+            if (string.IsNullOrEmpty(adminUser.PasswordHash) ||
+                adminUser.PasswordHash.StartsWith(oldIncorrectHash))
+            {
+                await context.Database.ExecuteSqlRawAsync(@"
+                    UPDATE ""Users"" SET ""PasswordHash"" = {0} WHERE ""Username"" = 'admin';
+                    UPDATE ""Users"" SET ""PasswordHash"" = {0} WHERE ""Username"" = 'owner';
+                    UPDATE ""Users"" SET ""PasswordHash"" = {0} WHERE ""Username"" = 'treasurer';
+                ", correctHash);
+
+                logger.LogInformation("User passwords updated with correct BCrypt hashes");
+            }
+
+            // Clear any account lockouts during startup (for development)
+            if (context.Database.GetConnectionString()?.Contains("localhost") == true)
+            {
+                var lockoutsCleared = await context.Database.ExecuteSqlRawAsync(@"
+                    DELETE FROM ""AccountLockouts"" WHERE ""UserId"" IN (
+                        SELECT ""Id"" FROM ""Users"" WHERE ""Username"" IN ('admin', 'owner', 'treasurer')
+                    );
+                ");
+
+                if (lockoutsCleared > 0)
+                {
+                    logger.LogInformation("Cleared {Count} account lockouts for default users", lockoutsCleared);
+                }
+            }
         }
         else
         {
@@ -105,6 +123,13 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+else
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+}
+
+// Add status code pages for 404 and other errors
+app.UseStatusCodePagesWithReExecute("/Error/{0}");
 
 app.UseHttpsRedirection();
 

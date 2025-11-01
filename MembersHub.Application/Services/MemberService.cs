@@ -260,15 +260,10 @@ public class MemberService : IMemberService
         // Check for duplicate phone
         var existingByPhone = await _context.Members.AnyAsync(m => m.Phone == member.Phone);
         if (existingByPhone)
-            errors.Add("Υπάρχει ήδη μέλος με αυτό το τηλέφωνο");
+            errors.Add($"Το τηλέφωνο {member.Phone} χρησιμοποιείται ήδη από άλλο μέλος. Παρακαλώ ελέγξτε αν το μέλος υπάρχει ήδη ή χρησιμοποιήστε διαφορετικό τηλέφωνο.");
 
-        // Check for duplicate email (if provided)
-        if (!string.IsNullOrEmpty(member.Email))
-        {
-            var existingByEmail = await _context.Members.AnyAsync(m => m.Email == member.Email);
-            if (existingByEmail)
-                errors.Add("Υπάρχει ήδη μέλος με αυτό το email");
-        }
+        // Email validation (if provided) - allowing duplicate emails for family members
+        // Note: Multiple children can share parent's email
 
         // Membership type validation
         var membershipTypeExists = await _context.MembershipTypes
@@ -278,7 +273,7 @@ public class MemberService : IMemberService
 
         if (errors.Any())
         {
-            throw new ArgumentException($"Validation errors: {string.Join(", ", errors)}");
+            throw new ArgumentException(string.Join(", ", errors));
         }
     }
 
@@ -307,15 +302,10 @@ public class MemberService : IMemberService
         // Check for duplicate phone (excluding current member)
         var existingByPhone = await _context.Members.AnyAsync(m => m.Phone == member.Phone && m.Id != member.Id);
         if (existingByPhone)
-            errors.Add("Υπάρχει ήδη μέλος με αυτό το τηλέφωνο");
+            errors.Add($"Το τηλέφωνο {member.Phone} χρησιμοποιείται ήδη από άλλο μέλος. Παρακαλώ ελέγξτε αν υπάρχει διπλό μέλος ή χρησιμοποιήστε διαφορετικό τηλέφωνο.");
 
-        // Check for duplicate email (if provided, excluding current member)
-        if (!string.IsNullOrEmpty(member.Email))
-        {
-            var existingByEmail = await _context.Members.AnyAsync(m => m.Email == member.Email && m.Id != member.Id);
-            if (existingByEmail)
-                errors.Add("Υπάρχει ήδη μέλος με αυτό το email");
-        }
+        // Email validation (if provided) - allowing duplicate emails for family members
+        // Note: Multiple children can share parent's email
 
         // Membership type validation
         var membershipTypeExists = await _context.MembershipTypes
@@ -325,7 +315,7 @@ public class MemberService : IMemberService
 
         if (errors.Any())
         {
-            throw new ArgumentException($"Validation errors: {string.Join(", ", errors)}");
+            throw new ArgumentException(string.Join(", ", errors));
         }
     }
 

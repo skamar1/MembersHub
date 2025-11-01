@@ -2,7 +2,7 @@
 @using MembersHub.Infrastructure.Data
 @using Microsoft.EntityFrameworkCore
 @using MudBlazor
-@inject MembersHubContext DbContext
+@inject IDbContextFactory<MembersHubContext> ContextFactory
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -103,8 +103,9 @@
     {
         if (Subscription != null)
         {
+            using var context = ContextFactory.CreateDbContext();
             // Load the subscription with member data
-            subscription = await DbContext.Subscriptions
+            subscription = await context.Subscriptions
                 .Include(s => s.Member)
                 .FirstOrDefaultAsync(s => s.Id == Subscription.Id);
 
@@ -125,13 +126,15 @@
         processing = true;
         try
         {
+            using var context = ContextFactory.CreateDbContext();
+
             subscription.Amount = editedAmount;
             subscription.DueDate = editedDueDate ?? subscription.DueDate;
             subscription.Status = editedStatus;
             subscription.Notes = string.IsNullOrWhiteSpace(editedNotes) ? null : editedNotes;
 
-            DbContext.Subscriptions.Update(subscription);
-            await DbContext.SaveChangesAsync();
+            context.Subscriptions.Update(subscription);
+            await context.SaveChangesAsync();
 
             Snackbar.Add("Η συνδρομή ενημερώθηκε επιτυχώς!", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));

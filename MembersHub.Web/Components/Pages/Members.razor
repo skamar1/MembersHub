@@ -97,6 +97,17 @@
                 <PropertyColumn Property="x => x.FullName" Title="Ονοματεπώνυμο" />
                 <PropertyColumn Property="x => x.Phone" Title="Τηλέφωνο" />
                 <PropertyColumn Property="x => x.Email" Title="Email" />
+                <TemplateColumn Title="Φύλο">
+                    <CellTemplate>
+                        @if (context.Item.Gender.HasValue)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default">
+                                @GetGenderText(context.Item.Gender.Value)
+                            </MudChip>
+                        }
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.City" Title="Πόλη" />
                 <PropertyColumn Property="x => x.MembershipType.Name" Title="Τύπος Συνδρομής" />
                 <PropertyColumn Property="x => x.MembershipType.MonthlyFee" Title="Μηνιαία Συνδρομή" Format="C2" />
                 <TemplateColumn Title="Κατάσταση">
@@ -121,12 +132,12 @@
                                            Variant="Variant.Filled"
                                            OnClick="() => EditMember(context.Item)" 
                                            title="Επεξεργασία" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Payment" 
-                                           Size="Size.Small" 
+                            <MudIconButton Icon="@Icons.Material.Filled.AccountBalance"
+                                           Size="Size.Small"
                                            Color="Color.Success"
                                            Variant="Variant.Filled"
-                                           OnClick="() => ViewPayments(context.Item)"
-                                           title="Πληρωμές" />
+                                           OnClick="() => ViewMemberCard(context.Item)"
+                                           title="Καρτέλα Μέλους" />
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" 
                                            Size="Size.Small" 
                                            Color="Color.Error"
@@ -166,6 +177,18 @@
                                         <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" /> @member.Email
                                     </MudText>
                                 }
+                                @if (member.Gender.HasValue)
+                                {
+                                    <MudText Typo="Typo.body2" Class="mb-1">
+                                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" /> @GetGenderText(member.Gender.Value)
+                                    </MudText>
+                                }
+                                @if (!string.IsNullOrEmpty(member.City))
+                                {
+                                    <MudText Typo="Typo.body2" Class="mb-1">
+                                        <MudIcon Icon="@Icons.Material.Filled.LocationCity" Size="Size.Small" /> @member.City
+                                    </MudText>
+                                }
                                 <MudText Typo="Typo.body2" Class="mb-1">
                                     <MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Small" /> @member.MembershipType.Name - €@member.MembershipType.MonthlyFee/μήνα
                                 </MudText>
@@ -178,10 +201,10 @@
                                                Size="Size.Small" 
                                                Color="Color.Primary"
                                                OnClick="() => EditMember(member)" />
-                                <MudIconButton Icon="@Icons.Material.Filled.Payment" 
-                                               Size="Size.Small" 
+                                <MudIconButton Icon="@Icons.Material.Filled.AccountBalance"
+                                               Size="Size.Small"
                                                Color="Color.Success"
-                                               OnClick="() => ViewPayments(member)" />
+                                               OnClick="() => ViewMemberCard(member)" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" 
                                                Size="Size.Small" 
                                                Color="Color.Error"
@@ -276,6 +299,14 @@
         MemberStatus.Suspended => "Αναστολή",
         _ => "Άγνωστο"
     };
+
+    private string GetGenderText(Gender gender) => gender switch
+    {
+        Gender.Male => "Άνδρας",
+        Gender.Female => "Γυναίκα",
+        Gender.Other => "Άλλο",
+        _ => "Άγνωστο"
+    };
     
     private async Task OpenCreateDialog()
     {
@@ -324,10 +355,24 @@
         }
     }
     
-    private void ViewPayments(Member member)
+    private async Task ViewMemberCard(Member member)
     {
-        // Navigate to payments view filtered by member
-        Navigation.NavigateTo($"/financial/payments?memberId={member.Id}");
+        var parameters = new DialogParameters<MemberFinancialCardDialog>
+        {
+            { x => x.Member, member }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.ExtraLarge,
+            FullWidth = true
+        };
+
+        await DialogService.ShowAsync<MemberFinancialCardDialog>(
+            $"Καρτέλα Μέλους - {member.FullName}",
+            parameters,
+            options);
     }
     
     private async Task DeleteMember(Member member)

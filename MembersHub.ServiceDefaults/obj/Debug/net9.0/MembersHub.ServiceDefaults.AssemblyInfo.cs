@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MembersHub.ServiceDefaults")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e8e730297dd8c0acf41042829a2b0ec1ab8e40ce")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9f80a8c8423a790213869da740f339278b9d53fb")]
 [assembly: System.Reflection.AssemblyProductAttribute("MembersHub.ServiceDefaults")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MembersHub.ServiceDefaults")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

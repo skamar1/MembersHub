@@ -1,0 +1,296 @@
+@page "/expense-categories"
+@using Microsoft.AspNetCore.Authorization
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Web.Components.Dialogs
+@attribute [Authorize(Roles = "Owner,Admin")]
+@using MudBlazor
+@inject IExpenseCategoryService ExpenseCategoryService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Διαχείριση Κατηγοριών Εξόδων - MembersHub</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Color="Color.Primary">
+        📂 Διαχείριση Κατηγοριών Εξόδων
+    </MudText>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <!-- Header με κουμπί προσθήκης -->
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h6">
+                Συνολικές Κατηγορίες: @categories.Count (@activeCount ενεργές)
+            </MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@OpenCreateDialog">
+                Νέα Κατηγορία
+            </MudButton>
+        </div>
+
+        <!-- Search -->
+        <MudTextField @bind-Value="searchString"
+                      Label="Αναζήτηση..."
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Class="mb-4" />
+
+        <!-- Desktop DataGrid -->
+        <MudHidden Breakpoint="Breakpoint.SmAndDown">
+            <MudDataGrid Items="@filteredCategories"
+                         Dense="true"
+                         Hover="true"
+                         Bordered="true"
+                         Striped="true"
+                         Loading="@loading"
+                         LoadingProgressColor="Color.Primary">
+                <Columns>
+                    <PropertyColumn Property="x => x.Name" Title="Όνομα" />
+                    <PropertyColumn Property="x => x.Description" Title="Περιγραφή" />
+                    <TemplateColumn Title="Icon">
+                        <CellTemplate>
+                            @if (!string.IsNullOrEmpty(context.Item.IconName))
+                            {
+                                <MudIcon Icon="@context.Item.IconName" Size="Size.Small" />
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Χρώμα">
+                        <CellTemplate>
+                            @if (!string.IsNullOrEmpty(context.Item.ColorCode))
+                            {
+                                <div style="width: 30px; height: 20px; background-color: @context.Item.ColorCode; border: 1px solid #ccc; border-radius: 4px;"></div>
+                            }
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.DisplayOrder" Title="Σειρά" />
+                    <TemplateColumn Title="Κατάσταση">
+                        <CellTemplate>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@(context.Item.IsActive ? Color.Success : Color.Default)">
+                                @(context.Item.IsActive ? "Ενεργή" : "Ανενεργή")
+                            </MudChip>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Ενέργειες" Sortable="false">
+                        <CellTemplate>
+                            <div class="d-flex gap-2">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                               Size="Size.Small"
+                                               Color="Color.Primary"
+                                               Variant="Variant.Filled"
+                                               OnClick="() => EditCategory(context.Item)"
+                                               title="Επεξεργασία" />
+                                <MudIconButton Icon="@(context.Item.IsActive ? Icons.Material.Filled.ToggleOff : Icons.Material.Filled.ToggleOn)"
+                                               Size="Size.Small"
+                                               Color="Color.Warning"
+                                               Variant="Variant.Filled"
+                                               OnClick="() => ToggleCategoryStatus(context.Item)"
+                                               title="@(context.Item.IsActive ? "Απενεργοποίηση" : "Ενεργοποίηση")" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               Variant="Variant.Filled"
+                                               OnClick="() => DeleteCategory(context.Item)"
+                                               title="Διαγραφή" />
+                            </div>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudHidden>
+
+        <!-- Mobile Cards -->
+        <MudHidden Breakpoint="Breakpoint.MdAndUp">
+            <MudGrid>
+                @foreach (var category in filteredCategories)
+                {
+                    <MudItem xs="12">
+                        <MudCard Class="mb-3">
+                            <MudCardContent>
+                                <div class="d-flex justify-space-between align-center mb-2">
+                                    <div class="d-flex align-center gap-2">
+                                        @if (!string.IsNullOrEmpty(category.IconName))
+                                        {
+                                            <MudIcon Icon="@category.IconName" Size="Size.Medium" />
+                                        }
+                                        <MudText Typo="Typo.h6">@category.Name</MudText>
+                                    </div>
+                                    <MudChip T="string" Size="Size.Small"
+                                             Color="@(category.IsActive ? Color.Success : Color.Default)">
+                                        @(category.IsActive ? "Ενεργή" : "Ανενεργή")
+                                    </MudChip>
+                                </div>
+                                @if (!string.IsNullOrEmpty(category.Description))
+                                {
+                                    <MudText Typo="Typo.body2" Class="mb-2">
+                                        @category.Description
+                                    </MudText>
+                                }
+                                <div class="d-flex align-center gap-2">
+                                    <MudText Typo="Typo.caption">Σειρά: @category.DisplayOrder</MudText>
+                                    @if (!string.IsNullOrEmpty(category.ColorCode))
+                                    {
+                                        <div style="width: 30px; height: 20px; background-color: @category.ColorCode; border: 1px solid #ccc; border-radius: 4px;"></div>
+                                    }
+                                </div>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                               Size="Size.Small"
+                                               Color="Color.Primary"
+                                               OnClick="() => EditCategory(category)" />
+                                <MudIconButton Icon="@(category.IsActive ? Icons.Material.Filled.ToggleOff : Icons.Material.Filled.ToggleOn)"
+                                               Size="Size.Small"
+                                               Color="Color.Warning"
+                                               OnClick="() => ToggleCategoryStatus(category)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="() => DeleteCategory(category)" />
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudHidden>
+
+        @if (!filteredCategories.Any() && !loading)
+        {
+            <div class="text-center pa-8">
+                <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Color="Color.Default" />
+                <MudText Typo="Typo.h6" Color="Color.Default" Class="mt-2">
+                    Δεν βρέθηκαν κατηγορίες
+                </MudText>
+            </div>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<ExpenseCategory> categories = new();
+    private bool loading = true;
+    private string searchString = "";
+
+    private int activeCount => categories.Count(c => c.IsActive);
+
+    private IEnumerable<ExpenseCategory> filteredCategories => categories.Where(c =>
+        string.IsNullOrWhiteSpace(searchString) ||
+        c.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+        (c.Description?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false)
+    ).OrderBy(c => c.DisplayOrder).ThenBy(c => c.Name);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try
+        {
+            categories = await ExpenseCategoryService.GetAllCategoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης δεδομένων: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ExpenseCategoryDialog>("Νέα Κατηγορία Εξόδου", options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task EditCategory(ExpenseCategory category)
+    {
+        var parameters = new DialogParameters<ExpenseCategoryDialog>
+        {
+            { x => x.ExistingCategory, category }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ExpenseCategoryDialog>($"Επεξεργασία Κατηγορίας - {category.Name}", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task ToggleCategoryStatus(ExpenseCategory category)
+    {
+        var action = category.IsActive ? "απενεργοποιήσετε" : "ενεργοποιήσετε";
+        var result = await DialogService.ShowMessageBox(
+            $"{(category.IsActive ? "Απενεργοποίηση" : "Ενεργοποίηση")} Κατηγορίας",
+            $"Είστε σίγουροι ότι θέλετε να {action} την κατηγορία '{category.Name}';",
+            yesText: "Ναι",
+            cancelText: "Άκυρο");
+
+        if (result == true)
+        {
+            try
+            {
+                await ExpenseCategoryService.ToggleCategoryStatusAsync(category.Id);
+                Snackbar.Add($"Η κατηγορία '{category.Name}' {(category.IsActive ? "απενεργοποιήθηκε" : "ενεργοποιήθηκε")} επιτυχώς", Severity.Success);
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteCategory(ExpenseCategory category)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Διαγραφή Κατηγορίας",
+            $"Είστε σίγουροι ότι θέλετε να διαγράψετε την κατηγορία '{category.Name}'; " +
+            "Η διαγραφή θα αποτύχει αν η κατηγορία χρησιμοποιείται από έξοδα.",
+            yesText: "Διαγραφή",
+            cancelText: "Άκυρο");
+
+        if (result == true)
+        {
+            try
+            {
+                await ExpenseCategoryService.DeleteCategoryAsync(category.Id);
+                Snackbar.Add($"Η κατηγορία '{category.Name}' διαγράφηκε επιτυχώς", Severity.Success);
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Σφάλμα διαγραφής: {ex.Message}", Severity.Warning);
+            }
+        }
+    }
+}

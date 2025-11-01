@@ -1,0 +1,387 @@
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using MudBlazor
+@inject IDbContextFactory<MembersHubContext> ContextFactory
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid Spacing="3">
+            <!-- Member Info Header -->
+            <MudItem xs="12">
+                <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-primary); color: white;">
+                    <MudText Typo="Typo.h5">@Member?.FullName</MudText>
+                    <MudText Typo="Typo.body2">Αριθμός Μέλους: @Member?.MemberNumber</MudText>
+                    <MudText Typo="Typo.body2">Τύπος: @Member?.MembershipType?.Name (€@Member?.MembershipType?.MonthlyFee/μήνα)</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Outstanding Balance Warning -->
+            @if (previousYearsBalance > 0)
+            {
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+                        <MudText Typo="Typo.subtitle1">
+                            <MudIcon Icon="@Icons.Material.Filled.Warning" />
+                            Χρέη από προηγούμενα έτη
+                        </MudText>
+                        <MudText Typo="Typo.h6" Class="mt-2">
+                            €@previousYearsBalance.ToString("N2")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mt-1">
+                            @previousYearsDetails
+                        </MudText>
+                    </MudAlert>
+                </MudItem>
+            }
+
+            <!-- Year Selection -->
+            <MudItem xs="12" md="6">
+                <MudSelect T="int"
+                           Value="selectedYear"
+                           ValueChanged="OnYearChanged"
+                           Label="Επιλογή Έτους"
+                           Variant="Variant.Outlined"
+                           AdornmentIcon="@Icons.Material.Filled.CalendarToday"
+                           AdornmentColor="Color.Primary">
+                    @foreach (var year in availableYears)
+                    {
+                        <MudSelectItem T="int" Value="@year">
+                            @year
+                            @if (year == DateTime.Now.Year)
+                            {
+                                <span style="color: var(--mud-palette-success); margin-left: 8px;">(Τρέχον)</span>
+                            }
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <!-- Summary Stats -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-3" Elevation="2">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Default">Συνολική Χρέωση</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Primary">€@yearSummary.TotalAmount.ToString("N2")</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Default">Εισπράχθηκε</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Success">€@yearSummary.PaidAmount.ToString("N2")</MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Default">Υπόλοιπο</MudText>
+                            <MudText Typo="Typo.h6" Color="@(yearSummary.RemainingAmount > 0 ? Color.Error : Color.Success)">
+                                €@yearSummary.RemainingAmount.ToString("N2")
+                            </MudText>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Default">Συνδρομές</MudText>
+                            <MudText Typo="Typo.h6">@subscriptions.Count μήνες</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Subscriptions Table -->
+            <MudItem xs="12">
+                <MudText Typo="Typo.h6" Class="mb-2">Συνδρομές @selectedYear</MudText>
+
+                @if (loading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                }
+                else if (subscriptions.Any())
+                {
+                    <MudSimpleTable Dense="true" Hover="true" Bordered="true" Striped="true">
+                        <thead>
+                            <tr>
+                                <th>Μήνας</th>
+                                <th>Ποσό</th>
+                                <th>Πληρώθηκε</th>
+                                <th>Υπόλοιπο</th>
+                                <th>Κατάσταση</th>
+                                <th>Ημ. Λήξης</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var sub in subscriptions.OrderBy(s => s.Month))
+                            {
+                                var paidAmount = sub.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount);
+                                var remainingAmount = sub.Amount - paidAmount;
+
+                                <tr>
+                                    <td>
+                                        <strong>@GetMonthName(sub.Month)</strong>
+                                    </td>
+                                    <td>€@sub.Amount.ToString("N2")</td>
+                                    <td>
+                                        @if (paidAmount > 0)
+                                        {
+                                            <span style="color: var(--mud-palette-success);">€@paidAmount.ToString("N2")</span>
+                                        }
+                                        else
+                                        {
+                                            <span>-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (remainingAmount > 0)
+                                        {
+                                            <span style="color: var(--mud-palette-error); font-weight: 600;">€@remainingAmount.ToString("N2")</span>
+                                        }
+                                        else
+                                        {
+                                            <span style="color: var(--mud-palette-success);">€0.00</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (paidAmount > 0 && paidAmount < sub.Amount)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Info">Μερικώς</MudChip>
+                                        }
+                                        else
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="@GetSubscriptionStatusColor(sub.Status)">
+                                                @GetSubscriptionStatusText(sub.Status)
+                                            </MudChip>
+                                        }
+                                    </td>
+                                    <td>@sub.DueDate.ToString("dd/MM/yyyy")</td>
+                                </tr>
+
+                                <!-- Show payments for this subscription -->
+                                @if (sub.Payments.Any(p => p.Status == PaymentStatus.Confirmed))
+                                {
+                                    <tr style="background-color: #f5f5f5;">
+                                        <td colspan="6">
+                                            <div style="padding-left: 20px;">
+                                                <MudText Typo="Typo.caption" Color="Color.Default">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Small" /> Εισπράξεις:
+                                                </MudText>
+                                                @foreach (var payment in sub.Payments.Where(p => p.Status == PaymentStatus.Confirmed).OrderBy(p => p.PaymentDate))
+                                                {
+                                                    <MudText Typo="Typo.caption" Class="ml-2">
+                                                        • @payment.PaymentDate.ToString("dd/MM/yyyy"): €@payment.Amount.ToString("N2")
+                                                        (@payment.PaymentMethod) - @payment.ReceiptNumber
+                                                    </MudText>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">
+                        Δεν υπάρχουν συνδρομές για το έτος @selectedYear
+                    </MudAlert>
+                }
+            </MudItem>
+
+            <!-- Action Buttons -->
+            <MudItem xs="12">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Payment"
+                           OnClick="CreatePayment"
+                           Disabled="@(yearSummary.RemainingAmount == 0)">
+                    Νέα Είσπραξη
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.AddCircle"
+                           OnClick="GenerateSubscriptions"
+                           Class="ml-2"
+                           Disabled="@(selectedYear < DateTime.Now.Year)">
+                    Δημιουργία Συνδρομών
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Κλείσιμο</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    public IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Member? Member { get; set; }
+
+    private List<Subscription> subscriptions = new();
+    private List<int> availableYears = new();
+    private int selectedYear = DateTime.Now.Year;
+    private bool loading = false;
+
+    private decimal previousYearsBalance = 0;
+    private string previousYearsDetails = "";
+
+    private class YearSummary
+    {
+        public decimal TotalAmount { get; set; }
+        public decimal PaidAmount { get; set; }
+        public decimal RemainingAmount { get; set; }
+    }
+
+    private YearSummary yearSummary = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Member == null) return;
+
+        // Initialize available years (from member creation year to current year + 1)
+        var startYear = Member.CreatedAt.Year;
+        var endYear = DateTime.Now.Year + 1;
+        availableYears = Enumerable.Range(startYear, endYear - startYear + 1).OrderByDescending(y => y).ToList();
+
+        await LoadSubscriptions();
+        await CalculatePreviousYearsBalance();
+    }
+
+    private async Task LoadSubscriptions()
+    {
+        if (Member == null) return;
+
+        loading = true;
+        try
+        {
+            using var context = ContextFactory.CreateDbContext();
+
+            subscriptions = await context.Subscriptions
+                .Include(s => s.Payments)
+                .Where(s => s.MemberId == Member.Id && s.Year == selectedYear)
+                .OrderBy(s => s.Month)
+                .ToListAsync();
+
+            CalculateYearSummary();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης συνδρομών: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task CalculatePreviousYearsBalance()
+    {
+        if (Member == null) return;
+
+        try
+        {
+            using var context = ContextFactory.CreateDbContext();
+
+            // Get all subscriptions from years BEFORE the selected year
+            var previousYearSubscriptions = await context.Subscriptions
+                .Include(s => s.Payments)
+                .Where(s => s.MemberId == Member.Id && s.Year < selectedYear)
+                .ToListAsync();
+
+            previousYearsBalance = 0;
+            var yearBalances = new Dictionary<int, decimal>();
+
+            foreach (var sub in previousYearSubscriptions)
+            {
+                var paidAmount = sub.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount);
+                var remainingAmount = sub.Amount - paidAmount;
+
+                if (remainingAmount > 0)
+                {
+                    previousYearsBalance += remainingAmount;
+
+                    if (!yearBalances.ContainsKey(sub.Year))
+                        yearBalances[sub.Year] = 0;
+                    yearBalances[sub.Year] += remainingAmount;
+                }
+            }
+
+            if (yearBalances.Any())
+            {
+                previousYearsDetails = string.Join(", ",
+                    yearBalances.OrderByDescending(kvp => kvp.Key)
+                        .Select(kvp => $"{kvp.Key}: €{kvp.Value:N2}"));
+            }
+            else
+            {
+                previousYearsDetails = "";
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα υπολογισμού προηγούμενων ετών: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void CalculateYearSummary()
+    {
+        yearSummary.TotalAmount = subscriptions.Sum(s => s.Amount);
+
+        foreach (var sub in subscriptions)
+        {
+            var paidAmount = sub.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount);
+            yearSummary.PaidAmount += paidAmount;
+        }
+
+        yearSummary.RemainingAmount = yearSummary.TotalAmount - yearSummary.PaidAmount;
+    }
+
+    private async Task OnYearChanged(int newYear)
+    {
+        selectedYear = newYear;
+        await LoadSubscriptions();
+        await CalculatePreviousYearsBalance();
+        StateHasChanged();
+    }
+
+    private void CreatePayment()
+    {
+        if (Member == null) return;
+        Navigation.NavigateTo($"/payments/new?memberId={Member.Id}");
+        MudDialog.Close();
+    }
+
+    private void GenerateSubscriptions()
+    {
+        // This would open the generate subscriptions dialog for this member
+        Snackbar.Add("Λειτουργία υπό ανάπτυξη", Severity.Info);
+    }
+
+    private void Close()
+    {
+        MudDialog.Cancel();
+    }
+
+    private string GetMonthName(int month)
+    {
+        var monthNames = new[] { "", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος",
+                                "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος" };
+        return month >= 1 && month <= 12 ? monthNames[month] : month.ToString();
+    }
+
+    private Color GetSubscriptionStatusColor(SubscriptionStatus status) => status switch
+    {
+        SubscriptionStatus.Paid => Color.Success,
+        SubscriptionStatus.Pending => Color.Warning,
+        SubscriptionStatus.Overdue => Color.Error,
+        _ => Color.Default
+    };
+
+    private string GetSubscriptionStatusText(SubscriptionStatus status) => status switch
+    {
+        SubscriptionStatus.Paid => "Πληρωμένη",
+        SubscriptionStatus.Pending => "Εκκρεμής",
+        SubscriptionStatus.Overdue => "Ληξιπρόθεσμη",
+        _ => status.ToString()
+    };
+}

@@ -1,0 +1,356 @@
+@page "/cashier-handover"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ICashierHandoverService HandoverService
+@inject ISessionService SessionService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
+
+<PageTitle>Παράδοση Ταμείου - MembersHub</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-6">💼 Παράδοση Ταμείου</MudText>
+
+    @if (loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+    }
+    else if (currentUser != null)
+    {
+        <!-- Current Period Summary -->
+        <MudCard Elevation="3" Class="mb-6">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">📊 Τρέχουσα Περίοδος - @currentUser.FullName</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+                    Αυτή η σελίδα δείχνει τα δικά σας στοιχεία. Κάθε ταμείας κάνει την παράδοση του ανεξάρτητα.
+                </MudAlert>
+                <MudGrid>
+                    <MudItem xs="12" md="3">
+                        <MudPaper Class="pa-4 text-center" Elevation="0">
+                            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Large" Color="Color.Info" Class="mb-2" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Ημερομηνία Έναρξης</MudText>
+                            <MudText Typo="Typo.h6">@periodStart.ToString("dd/MM/yyyy")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudPaper Class="pa-4 text-center" Elevation="0" Style="background-color: #e8f5e9;">
+                            <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Large" Color="Color.Success" Class="mb-2" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Συνολικές Εισπράξεις</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Success">€@totalCollections.ToString("N2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudPaper Class="pa-4 text-center" Elevation="0" Style="background-color: #ffebee;">
+                            <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Size="Size.Large" Color="Color.Error" Class="mb-2" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Συνολικά Έξοδα</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Error">€@totalExpenses.ToString("N2")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudPaper Class="pa-4 text-center" Elevation="0" Style="background-color: #e3f2fd;">
+                            <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Καθαρό Υπόλοιπο</MudText>
+                            <MudText Typo="Typo.h6" Color="@(netBalance >= 0 ? Color.Primary : Color.Error)">
+                                €@netBalance.ToString("N2")
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudTextField @bind-Value="handoverNotes"
+                              Label="Σημειώσεις Παράδοσης"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              HelperText="Προσθέστε τυχόν παρατηρήσεις ή σημειώσεις για αυτή την παράδοση" />
+            </MudCardContent>
+            <MudCardActions Class="d-flex justify-center pa-4">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Success"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.CheckCircle"
+                           OnClick="CreateHandover"
+                           Disabled="processing">
+                    @if (processing)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Επεξεργασία...</span>
+                    }
+                    else
+                    {
+                        <span>Παράδοση Ταμείου</span>
+                    }
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.History"
+                           OnClick="ViewHistory">
+                    Ιστορικό Παραδόσεων
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+
+        <!-- Pending Handovers (Admin/Owner Only) -->
+        <AuthorizeView Roles="Admin,Owner" Context="adminContext">
+            <Authorized>
+                @if (pendingHandovers.Any())
+                {
+                    <MudCard Elevation="3" Class="mb-6">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">⏳ Εκκρεμείς Παραδόσεις</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudTable Items="@pendingHandovers" Hover="true" Dense="true">
+                                <HeaderContent>
+                                    <MudTh>Ταμείας</MudTh>
+                                    <MudTh>Περίοδος</MudTh>
+                                    <MudTh>Εισπράξεις</MudTh>
+                                    <MudTh>Έξοδα</MudTh>
+                                    <MudTh>Υπόλοιπο</MudTh>
+                                    <MudTh>Ημερομηνία</MudTh>
+                                    <MudTh>Ενέργειες</MudTh>
+                                </HeaderContent>
+                                <RowTemplate Context="handoverRow">
+                                    <MudTd DataLabel="Ταμείας">@handoverRow.Cashier.FullName</MudTd>
+                                    <MudTd DataLabel="Περίοδος">
+                                        @handoverRow.PeriodStartDate.ToString("dd/MM/yyyy") - @handoverRow.PeriodEndDate.ToString("dd/MM/yyyy")
+                                    </MudTd>
+                                    <MudTd DataLabel="Εισπράξεις">
+                                        <MudText Color="Color.Success">€@handoverRow.TotalCollections.ToString("N2")</MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Έξοδα">
+                                        <MudText Color="Color.Error">€@handoverRow.TotalExpenses.ToString("N2")</MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Υπόλοιπο">
+                                        <MudText Color="@(handoverRow.NetBalance >= 0 ? Color.Primary : Color.Error)" Typo="Typo.body1" Style="font-weight: 600;">
+                                            €@handoverRow.NetBalance.ToString("N2")
+                                        </MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Ημερομηνία">@handoverRow.CreatedDate.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                                    <MudTd DataLabel="Ενέργειες">
+                                        <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                                            <MudButton Color="Color.Success"
+                                                       StartIcon="@Icons.Material.Filled.Check"
+                                                       OnClick="@(() => ConfirmHandover(handoverRow.Id))">
+                                                Επιβεβαίωση
+                                            </MudButton>
+                                            <MudButton Color="Color.Error"
+                                                       StartIcon="@Icons.Material.Filled.Close"
+                                                       OnClick="@(() => RejectHandover(handoverRow.Id))">
+                                                Απόρριψη
+                                            </MudButton>
+                                        </MudButtonGroup>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </Authorized>
+        </AuthorizeView>
+
+        <!-- Information Panel -->
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                Πληροφορίες
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">
+                • Κάθε ταμείας κάνει την παράδοση του ανεξάρτητα από τους άλλους ταμείες
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">
+                • Η παράδοση καταγράφει όλες τις εισπράξεις και τα έξοδα από την τελευταία σας παράδοση μέχρι σήμερα
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">
+                • Μετά την παράδοση, η τρέχουσα περίοδός σας κλείνει και ξεκινά μια νέα περίοδος από το μηδέν
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">
+                • Οι παραδόσεις πρέπει να επιβεβαιωθούν από Διαχειριστή ή Ιδιοκτήτη
+            </MudText>
+            <MudText Typo="Typo.body2">
+                • Μπορείτε να δείτε το ιστορικό των δικών σας παραδόσεων στην καρτέλα "Ιστορικό Παραδόσεων"
+            </MudText>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private User? currentUser;
+    private bool loading = true;
+    private bool processing = false;
+
+    private DateTime periodStart;
+    private decimal totalCollections;
+    private decimal totalExpenses;
+    private decimal netBalance;
+    private string handoverNotes = string.Empty;
+
+    private List<CashierHandover> pendingHandovers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = await SessionService.GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try
+        {
+            if (currentUser != null)
+            {
+                // Load current period summary
+                var summary = await HandoverService.GetCashierCurrentPeriodSummaryAsync(currentUser.Id);
+                periodStart = summary.PeriodStart == DateTime.MinValue ? DateTime.Now : summary.PeriodStart;
+                totalCollections = summary.TotalCollections;
+                totalExpenses = summary.TotalExpenses;
+                netBalance = summary.NetBalance;
+
+                // Load pending handovers if admin/owner
+                if (currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner)
+                {
+                    pendingHandovers = await HandoverService.GetPendingHandoversAsync();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης δεδομένων: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task CreateHandover()
+    {
+        if (currentUser == null) return;
+
+        var result = await DialogService.ShowMessageBox(
+            "Επιβεβαίωση Παράδοσης",
+            $"Παράδοση Ταμείου: {currentUser.FullName}\n\n" +
+            $"Θέλετε σίγουρα να κάνετε παράδοση ταμείου;\n\n" +
+            $"Συνολικές Εισπράξεις: €{totalCollections:N2}\n" +
+            $"Συνολικά Έξοδα: €{totalExpenses:N2}\n" +
+            $"Καθαρό Υπόλοιπο: €{netBalance:N2}\n\n" +
+            $"Μετά την παράδοση, η τρέχουσα περίοδος θα κλείσει.",
+            yesText: "Επιβεβαίωση",
+            cancelText: "Ακύρωση");
+
+        if (result != true) return;
+
+        processing = true;
+        try
+        {
+            var handover = await HandoverService.CreateHandoverAsync(currentUser.Id, handoverNotes);
+            Snackbar.Add("Η παράδοση ταμείου καταχωρήθηκε επιτυχώς! Αναμένει επιβεβαίωση από Διαχειριστή.", Severity.Success);
+
+            // Reset form and reload data
+            handoverNotes = string.Empty;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα κατά την παράδοση ταμείου: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            processing = false;
+        }
+    }
+
+    private async Task ConfirmHandover(int handoverId)
+    {
+        if (currentUser == null) return;
+
+        var result = await DialogService.ShowMessageBox(
+            "Επιβεβαίωση Παράδοσης",
+            "Θέλετε σίγουρα να επιβεβαιώσετε αυτή την παράδοση ταμείου;",
+            yesText: "Επιβεβαίωση",
+            cancelText: "Ακύρωση");
+
+        if (result != true) return;
+
+        try
+        {
+            var success = await HandoverService.ConfirmHandoverAsync(handoverId, currentUser.Id);
+            if (success)
+            {
+                Snackbar.Add("Η παράδοση επιβεβαιώθηκε επιτυχώς!", Severity.Success);
+                await LoadData();
+            }
+            else
+            {
+                Snackbar.Add("Δεν ήταν δυνατή η επιβεβαίωση της παράδοσης.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RejectHandover(int handoverId)
+    {
+        if (currentUser == null) return;
+
+        // Prompt for rejection reason
+        var parameters = new DialogParameters
+        {
+            { "Reason", "" }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+
+        // You would create a simple dialog component for this, or use a simple input
+        var result = await DialogService.ShowMessageBox(
+            "Απόρριψη Παράδοσης",
+            "Θέλετε σίγουρα να απορρίψετε αυτή την παράδοση ταμείου;\n(Παρακαλώ καταγράψτε τον λόγο στις σημειώσεις)",
+            yesText: "Απόρριψη",
+            cancelText: "Ακύρωση");
+
+        if (result != true) return;
+
+        try
+        {
+            var success = await HandoverService.RejectHandoverAsync(handoverId, currentUser.Id, "Απορρίφθηκε από διαχειριστή");
+            if (success)
+            {
+                Snackbar.Add("Η παράδοση απορρίφθηκε.", Severity.Info);
+                await LoadData();
+            }
+            else
+            {
+                Snackbar.Add("Δεν ήταν δυνατή η απόρριψη της παράδοσης.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void ViewHistory()
+    {
+        Navigation.NavigateTo("/handover-history");
+    }
+}

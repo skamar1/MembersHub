@@ -14,7 +14,7 @@
 @inject IJSRuntime JSRuntime
 @attribute [Authorize]
 
-<PageTitle>Νέα Πληρωμή</PageTitle>
+<PageTitle>Νέα Είσπραξη</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
     <MudCard>
@@ -22,7 +22,7 @@
             <CardHeaderContent>
                 <MudText Typo="Typo.h4">
                     <MudIcon Icon="@Icons.Material.Filled.Payment" Class="mr-2" />
-                    Νέα Πληρωμή
+                    Νέα Είσπραξη
                 </MudText>
             </CardHeaderContent>
             <CardHeaderActions>
@@ -39,7 +39,8 @@
                     <!-- Member Selection -->
                     <MudItem xs="12">
                         <MudAutocomplete T="Member"
-                                         @bind-Value="selectedMember"
+                                         Value="selectedMember"
+                                         ValueChanged="OnMemberSelected"
                                          Label="Επιλογή Μέλους *"
                                          Variant="Variant.Outlined"
                                          Required="true"
@@ -78,39 +79,157 @@
                         <MudItem xs="12">
                             <MudAlert Severity="Severity.Info" Dense="true">
                                 <MudGrid AlignItems="Center">
-                                    <MudItem xs="12" md="4">
+                                    <MudItem xs="12" md="3">
                                         <MudText Typo="Typo.subtitle2">Μέλος:</MudText>
                                         <MudText Typo="Typo.body2">@selectedMember.FullName</MudText>
                                     </MudItem>
-                                    <MudItem xs="12" md="4">
+                                    <MudItem xs="12" md="3">
                                         <MudText Typo="Typo.subtitle2">Τύπος Συνδρομής:</MudText>
                                         <MudText Typo="Typo.body2">@selectedMember.MembershipType?.Name</MudText>
                                     </MudItem>
-                                    <MudItem xs="12" md="4">
+                                    <MudItem xs="12" md="3">
                                         <MudText Typo="Typo.subtitle2">Μηνιαία Συνδρομή:</MudText>
                                         <MudText Typo="Typo.body2">€@selectedMember.MembershipType?.MonthlyFee.ToString("F2")</MudText>
+                                    </MudItem>
+                                    <MudItem xs="12" md="3">
+                                        <MudText Typo="Typo.subtitle2">Υπόλοιπο:</MudText>
+                                        <MudText Typo="Typo.body2" Style="@GetBalanceStyle()">
+                                            <strong>€@memberBalance.ToString("F2")</strong>
+                                        </MudText>
                                     </MudItem>
                                 </MudGrid>
                             </MudAlert>
                         </MudItem>
 
-                        <!-- Outstanding Subscriptions Info -->
+                        <!-- Outstanding Subscriptions Details -->
                         @if (outstandingSubscriptions.Any())
                         {
                             <MudItem xs="12">
                                 <MudAlert Severity="Severity.Warning" Dense="true">
-                                    <MudText Typo="Typo.subtitle2">Εκκρεμείς Συνδρομές:</MudText>
+                                    <MudGrid AlignItems="Center">
+                                        <MudItem xs="12">
+                                            <MudText Typo="Typo.subtitle2">
+                                                <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mr-1" />
+                                                Εκκρεμείς Συνδρομές (@outstandingSubscriptions.Count)
+                                            </MudText>
+                                        </MudItem>
+                                        <MudItem xs="12">
+                                            <MudText Typo="Typo.body2" Class="mb-2">
+                                                Υπόλοιπο προς πληρωμή: <strong>€@memberBalance.ToString("F2")</strong>
+                                            </MudText>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Class="mr-1 mb-1"
+                                                     Icon="@Icons.Material.Filled.Info">
+                                                @outstandingSubscriptions.Count συνδρομές
+                                            </MudChip>
+                                            @if (outstandingSubscriptions.Any(s => s.Status == SubscriptionStatus.Overdue))
+                                            {
+                                                var overdueCount = outstandingSubscriptions.Count(s => s.Status == SubscriptionStatus.Overdue);
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Error" Class="mr-1 mb-1"
+                                                         Icon="@Icons.Material.Filled.Warning">
+                                                    @overdueCount ληξιπρόθεσμες
+                                                </MudChip>
+                                            }
+                                            @{
+                                                var partiallyPaidCount = outstandingSubscriptions.Count(s =>
+                                                    s.Payments.Any(p => p.Status == PaymentStatus.Confirmed) &&
+                                                    s.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount) < s.Amount);
+
+                                                if (partiallyPaidCount > 0)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="mr-1 mb-1"
+                                                             Icon="@Icons.Material.Filled.PendingActions">
+                                                        @partiallyPaidCount μερικώς πληρωμένες
+                                                    </MudChip>
+                                                }
+                                            }
+                                        </MudItem>
+                                        <MudItem xs="12">
+                                            <MudDivider Class="my-2" />
+                                            <MudText Typo="Typo.caption" Class="mb-2"><strong>Λεπτομέρειες Συνδρομών:</strong></MudText>
+                                            @foreach (var sub in outstandingSubscriptions.Take(5))
+                                            {
+                                                var paidAmount = sub.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount);
+                                                var remainingAmount = sub.Amount - paidAmount;
+                                                <MudText Typo="Typo.caption" Class="mb-1">
+                                                    • @GetMonthName(sub.Month) @sub.Year:
+                                                    @if (paidAmount > 0)
+                                                    {
+                                                        <span>€@paidAmount.ToString("F2") / €@sub.Amount.ToString("F2") (Υπόλοιπο: €@remainingAmount.ToString("F2"))</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>€@sub.Amount.ToString("F2") (Απλήρωτη)</span>
+                                                    }
+                                                </MudText>
+                                            }
+                                            @if (outstandingSubscriptions.Count > 5)
+                                            {
+                                                <MudText Typo="Typo.caption" Class="mt-1" Color="Color.Secondary">
+                                                    ... και @(outstandingSubscriptions.Count - 5) ακόμα
+                                                </MudText>
+                                            }
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudAlert>
+                            </MudItem>
+                        }
+                        else
+                        {
+                            <MudItem xs="12">
+                                <MudAlert Severity="Severity.Success" Dense="true">
                                     <MudText Typo="Typo.body2">
-                                        Το μέλος έχει @outstandingSubscriptions.Count εκκρεμείς συνδρομές συνολικού ποσού €@outstandingSubscriptions.Sum(s => s.Amount).ToString("F2")
+                                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                                        Το μέλος δεν έχει εκκρεμείς συνδρομές
                                     </MudText>
                                 </MudAlert>
                             </MudItem>
                         }
                     }
 
+                    <!-- Subscription Selection -->
+                    @if (outstandingSubscriptions.Any())
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="int?"
+                                       Value="selectedSubscriptionId"
+                                       ValueChanged="OnSubscriptionChanged"
+                                       Label="Για Συνδρομή *"
+                                       Variant="Variant.Outlined"
+                                       Required="true"
+                                       RequiredError="Επιλέξτε συνδρομή"
+                                       HelperText="Επιλέξτε από ποια συνδρομή θα ξεκινήσει η πληρωμή"
+                                       Margin="Margin.Dense"
+                                       AdornmentIcon="@Icons.Material.Filled.CalendarMonth"
+                                       AdornmentColor="Color.Primary">
+                                @foreach (var sub in outstandingSubscriptions)
+                                {
+                                    var paidAmount = sub.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount);
+                                    var remainingAmount = sub.Amount - paidAmount;
+
+                                    <MudSelectItem T="int?" Value="@sub.Id">
+                                        <div class="d-flex align-center justify-space-between">
+                                            <span>@GetMonthName(sub.Month) @sub.Year</span>
+                                            @if (paidAmount > 0)
+                                            {
+                                                <span class="ml-2" style="font-size: 0.875em; color: #666;">
+                                                    €@paidAmount.ToString("F2") / €@sub.Amount.ToString("F2") (Υπ: €@remainingAmount.ToString("F2"))
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="ml-2" style="font-size: 0.875em; color: #666;">€@sub.Amount.ToString("F2")</span>
+                                            }
+                                        </div>
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    }
+
                     <!-- Amount -->
                     <MudItem xs="12" md="6">
-                        <MudNumericField @bind-Value="payment.Amount"
+                        <MudNumericField Value="payment.Amount"
+                                         ValueChanged="@((decimal val) => OnAmountChanged(val))"
                                          Label="Ποσό (€) *"
                                          Variant="Variant.Outlined"
                                          Required="true"
@@ -123,13 +242,55 @@
                                          AdornmentColor="Color.Success" />
                     </MudItem>
 
+                    <!-- Payment Distribution Preview -->
+                    @if (selectedSubscriptionId.HasValue && payment.Amount > 0)
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Info" Dense="true">
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" />
+                                    Προεπισκόπηση Κατανομής Πληρωμής
+                                </MudText>
+                                @{
+                                    var distribution = CalculatePaymentDistribution(selectedSubscriptionId.Value, payment.Amount);
+                                }
+                                @if (distribution.Any())
+                                {
+                                    @foreach (var item in distribution)
+                                    {
+                                        <MudText Typo="Typo.body2" Class="mb-1">
+                                            • @GetMonthName(item.Subscription.Month) @item.Subscription.Year:
+                                            <strong>€@item.AmountToApply.ToString("F2")</strong>
+                                            @if (item.AmountToApply >= item.RemainingAmount)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="ml-1" Style="height: 20px;">Πλήρης</MudChip>
+                                            }
+                                            else
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-1" Style="height: 20px;">Μερική</MudChip>
+                                            }
+                                        </MudText>
+                                    }
+                                    @if (distribution.Sum(d => d.AmountToApply) < payment.Amount)
+                                    {
+                                        var excess = payment.Amount - distribution.Sum(d => d.AmountToApply);
+                                        <MudText Typo="Typo.body2" Color="Color.Warning" Class="mt-2">
+                                            <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" />
+                                            Υπερβάλλον ποσό: €@excess.ToString("F2") (θα καταγραφεί ως πίστωση)
+                                        </MudText>
+                                    }
+                                }
+                            </MudAlert>
+                        </MudItem>
+                    }
+
                     <!-- Payment Method -->
                     <MudItem xs="12" md="6">
                         <MudSelect @bind-Value="payment.PaymentMethod"
-                                   Label="Μέθοδος Πληρωμής *"
+                                   Label="Μέθοδος Είσπραξης *"
                                    Variant="Variant.Outlined"
                                    Required="true"
-                                   RequiredError="Επιλέξτε μέθοδο πληρωμής"
+                                   RequiredError="Επιλέξτε μέθοδο είσπραξης"
                                    Margin="Margin.Dense"
                                    AdornmentIcon="@Icons.Material.Filled.CreditCard"
                                    AdornmentColor="Color.Primary">
@@ -175,7 +336,7 @@
                     <!-- Payment Date -->
                     <MudItem xs="12" md="6">
                         <MudDatePicker @bind-Date="paymentDate"
-                                       Label="Ημερομηνία Πληρωμής *"
+                                       Label="Ημερομηνία Είσπραξης *"
                                        Variant="Variant.Outlined"
                                        DateFormat="dd/MM/yyyy"
                                        MaxDate="DateTime.Today"
@@ -280,7 +441,7 @@
         <MudCard Class="mt-4">
             <MudCardHeader>
                 <CardHeaderContent>
-                    <MudText Typo="Typo.h6">Πρόσφατες Πληρωμές</MudText>
+                    <MudText Typo="Typo.h6">Πρόσφατες Εισπράξεις</MudText>
                 </CardHeaderContent>
             </MudCardHeader>
             <MudCardContent>
@@ -333,6 +494,15 @@
     private DateTime? paymentDate = DateTime.Today;
     private List<Subscription> outstandingSubscriptions = new();
     private List<Payment> recentPayments = new();
+    private decimal memberBalance = 0;
+    private int? selectedSubscriptionId;
+
+    private class PaymentDistributionItem
+    {
+        public Subscription Subscription { get; set; } = null!;
+        public decimal RemainingAmount { get; set; }
+        public decimal AmountToApply { get; set; }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -404,6 +574,23 @@
         }
     }
 
+    private async Task OnMemberSelected(Member? member)
+    {
+        selectedMember = member;
+
+        if (member != null)
+        {
+            await LoadMemberSubscriptions();
+        }
+        else
+        {
+            // Reset balance and subscriptions when member is cleared
+            memberBalance = 0;
+            outstandingSubscriptions.Clear();
+            payment.Amount = 0;
+        }
+    }
+
     private async Task LoadMemberSubscriptions()
     {
         if (selectedMember == null) return;
@@ -417,16 +604,89 @@
                 .ThenBy(s => s.Month)
                 .ToList();
 
-            // Auto-calculate amount if subscriptions are selected
+            // Calculate member balance (total outstanding amount minus paid amounts)
+            memberBalance = 0;
+            foreach (var subscription in outstandingSubscriptions)
+            {
+                var paidAmount = subscription.Payments
+                    .Where(p => p.Status == PaymentStatus.Confirmed)
+                    .Sum(p => p.Amount);
+                var remainingAmount = subscription.Amount - paidAmount;
+                memberBalance += remainingAmount > 0 ? remainingAmount : 0;
+            }
+
+            // Auto-select oldest outstanding subscription and calculate amount
             if (outstandingSubscriptions.Any())
             {
-                payment.Amount = outstandingSubscriptions.Sum(s => s.Amount);
+                selectedSubscriptionId = outstandingSubscriptions.First().Id;
+                payment.Amount = memberBalance;
             }
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Σφάλμα φόρτωσης συνδρομών: {ex.Message}", Severity.Error);
         }
+    }
+
+    private void OnSubscriptionChanged(int? newSubscriptionId)
+    {
+        selectedSubscriptionId = newSubscriptionId;
+
+        if (newSubscriptionId.HasValue)
+        {
+            // Auto-fill with remaining balance starting from this subscription
+            var startIndex = outstandingSubscriptions.FindIndex(s => s.Id == newSubscriptionId.Value);
+            if (startIndex >= 0)
+            {
+                decimal suggestedAmount = 0;
+                foreach (var sub in outstandingSubscriptions.Skip(startIndex))
+                {
+                    var paidAmount = sub.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount);
+                    var remaining = sub.Amount - paidAmount;
+                    suggestedAmount += remaining > 0 ? remaining : 0;
+                }
+                payment.Amount = suggestedAmount;
+            }
+        }
+        StateHasChanged();
+    }
+
+    private void OnAmountChanged(decimal newAmount)
+    {
+        payment.Amount = newAmount;
+        StateHasChanged();
+    }
+
+    private List<PaymentDistributionItem> CalculatePaymentDistribution(int startingSubscriptionId, decimal totalAmount)
+    {
+        var distribution = new List<PaymentDistributionItem>();
+        var remainingPayment = totalAmount;
+
+        // Find the starting subscription index
+        var startIndex = outstandingSubscriptions.FindIndex(s => s.Id == startingSubscriptionId);
+        if (startIndex == -1) return distribution;
+
+        // Distribute payment starting from selected subscription
+        for (int i = startIndex; i < outstandingSubscriptions.Count && remainingPayment > 0; i++)
+        {
+            var subscription = outstandingSubscriptions[i];
+            var paidAmount = subscription.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount);
+            var remaining = subscription.Amount - paidAmount;
+
+            if (remaining > 0)
+            {
+                var amountToApply = Math.Min(remainingPayment, remaining);
+                distribution.Add(new PaymentDistributionItem
+                {
+                    Subscription = subscription,
+                    RemainingAmount = remaining,
+                    AmountToApply = amountToApply
+                });
+                remainingPayment -= amountToApply;
+            }
+        }
+
+        return distribution;
     }
 
     private async Task Submit()
@@ -443,6 +703,13 @@
     {
         if (!formIsValid || selectedMember == null || !paymentDate.HasValue) return;
 
+        // Validate subscription selection if outstanding subscriptions exist
+        if (outstandingSubscriptions.Any() && !selectedSubscriptionId.HasValue)
+        {
+            Snackbar.Add("Παρακαλώ επιλέξτε συνδρομή", Severity.Warning);
+            return;
+        }
+
         processing = true;
         try
         {
@@ -456,37 +723,91 @@
                 collectorId = userId;
             }
 
-            // Set payment properties
-            payment.MemberId = selectedMember.Id;
-            payment.PaymentDate = paymentDate.Value;
-            payment.CollectorId = collectorId;
-            payment.CreatedAt = DateTime.UtcNow;
+            var createdPayments = new List<Payment>();
 
-            // Link to first outstanding subscription if any
-            var firstSub = outstandingSubscriptions.FirstOrDefault();
-            if (firstSub != null)
+            // Calculate payment distribution
+            if (selectedSubscriptionId.HasValue)
             {
-                payment.SubscriptionId = firstSub.Id;
+                var distribution = CalculatePaymentDistribution(selectedSubscriptionId.Value, payment.Amount);
+
+                // Create separate payment record for each subscription in distribution
+                foreach (var item in distribution)
+                {
+                    var paymentRecord = new Payment
+                    {
+                        MemberId = selectedMember.Id,
+                        SubscriptionId = item.Subscription.Id,
+                        Amount = item.AmountToApply,
+                        PaymentDate = paymentDate.Value,
+                        CollectorId = collectorId,
+                        PaymentMethod = payment.PaymentMethod,
+                        TransactionReference = payment.TransactionReference,
+                        Notes = distribution.Count > 1
+                            ? $"{payment.Notes} (Μέρος πληρωμής για {GetMonthName(item.Subscription.Month)} {item.Subscription.Year})"
+                            : payment.Notes,
+                        Status = PaymentStatus.Confirmed,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    var created = await PaymentService.CreatePaymentAsync(paymentRecord);
+                    createdPayments.Add(created);
+                }
+
+                // Handle excess payment (overpayment)
+                var totalDistributed = distribution.Sum(d => d.AmountToApply);
+                if (payment.Amount > totalDistributed)
+                {
+                    var excessAmount = payment.Amount - totalDistributed;
+                    var creditPayment = new Payment
+                    {
+                        MemberId = selectedMember.Id,
+                        SubscriptionId = null, // No specific subscription - credit
+                        Amount = excessAmount,
+                        PaymentDate = paymentDate.Value,
+                        CollectorId = collectorId,
+                        PaymentMethod = payment.PaymentMethod,
+                        TransactionReference = payment.TransactionReference,
+                        Notes = $"{payment.Notes} (Πίστωση - Υπερβάλλον ποσό)",
+                        Status = PaymentStatus.Confirmed,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    var created = await PaymentService.CreatePaymentAsync(creditPayment);
+                    createdPayments.Add(created);
+                }
+            }
+            else
+            {
+                // No subscription selected - create as general payment
+                payment.MemberId = selectedMember.Id;
+                payment.PaymentDate = paymentDate.Value;
+                payment.CollectorId = collectorId;
+                payment.CreatedAt = DateTime.UtcNow;
+                var created = await PaymentService.CreatePaymentAsync(payment);
+                createdPayments.Add(created);
             }
 
-            // Create payment
-            var createdPayment = await PaymentService.CreatePaymentAsync(payment);
-
-            // Send email receipt if requested
-            if (sendEmailReceipt && !string.IsNullOrEmpty(selectedMember.Email))
+            // Send email receipt if requested (for the first payment record)
+            if (sendEmailReceipt && !string.IsNullOrEmpty(selectedMember.Email) && createdPayments.Any())
             {
                 try
                 {
-                    await PaymentService.SendReceiptAsync(createdPayment.Id);
+                    await PaymentService.SendReceiptAsync(createdPayments.First().Id);
                     Snackbar.Add("Απόδειξη στάλθηκε με email", Severity.Info);
                 }
                 catch
                 {
-                    Snackbar.Add("Η απόδειξη δημιουργήθηκε αλλά δεν στάλθηκε email", Severity.Warning);
+                    Snackbar.Add("Η είσπραξη δημιουργήθηκε αλλά δεν στάλθηκε email", Severity.Warning);
                 }
             }
 
-            Snackbar.Add($"Η πληρωμή {createdPayment.ReceiptNumber} καταχωρήθηκε επιτυχώς", Severity.Success);
+            if (createdPayments.Count == 1)
+            {
+                Snackbar.Add($"Η είσπραξη {createdPayments.First().ReceiptNumber} καταχωρήθηκε επιτυχώς", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"Δημιουργήθηκαν {createdPayments.Count} εισπράξεις επιτυχώς", Severity.Success);
+            }
 
             if (createNew)
             {
@@ -497,8 +818,10 @@
                     Status = PaymentStatus.Confirmed
                 };
                 selectedMember = null;
+                selectedSubscriptionId = null;
                 paymentDate = DateTime.Today;
                 outstandingSubscriptions.Clear();
+                memberBalance = 0;
                 await LoadRecentPayments();
                 StateHasChanged();
             }
@@ -556,4 +879,20 @@
         SubscriptionStatus.Overdue => "Ληξιπρόθεσμη",
         _ => status.ToString()
     };
+
+    private string GetBalanceStyle()
+    {
+        if (memberBalance > 0)
+        {
+            return "color: #d84315; font-size: 1.1em;"; // Red color for outstanding balance
+        }
+        return "color: #2e7d32; font-size: 1.1em;"; // Green color for zero balance
+    }
+
+    private string GetMonthName(int month)
+    {
+        var monthNames = new[] { "", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος",
+                                "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος" };
+        return month >= 1 && month <= 12 ? monthNames[month] : month.ToString();
+    }
 }

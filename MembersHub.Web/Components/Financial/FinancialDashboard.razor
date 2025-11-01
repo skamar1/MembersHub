@@ -21,9 +21,21 @@
                 <MudDatePicker Label="Έως" @bind-Date="endDate" />
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadDashboardData" Class="mt-4">
-                    <MudIcon Icon="Icons.Material.Filled.Refresh" Class="mr-2" />
-                    Ανανέωση
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="LoadDashboardData"
+                           Class="mt-4"
+                           Disabled="@loading">
+                    @if (loading)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                        <MudText Class="ms-2">Φόρτωση...</MudText>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="Icons.Material.Filled.Refresh" Class="mr-2" />
+                        <MudText>Ανανέωση</MudText>
+                    }
                 </MudButton>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">

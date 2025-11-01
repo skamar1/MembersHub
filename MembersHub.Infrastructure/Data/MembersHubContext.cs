@@ -17,6 +17,7 @@ public class MembersHubContext : DbContext
     public DbSet<Subscription> Subscriptions { get; set; } = null!;
     public DbSet<Payment> Payments { get; set; } = null!;
     public DbSet<Expense> Expenses { get; set; } = null!;
+    public DbSet<ExpenseCategory> ExpenseCategories { get; set; } = null!;
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; } = null!;
     public DbSet<PasswordResetRateLimit> PasswordResetRateLimits { get; set; } = null!;
@@ -35,6 +36,8 @@ public class MembersHubContext : DbContext
     public DbSet<PaymentInstallment> PaymentInstallments { get; set; } = null!;
     public DbSet<FinancialTransaction> FinancialTransactions { get; set; } = null!;
     public DbSet<FinancialReport> FinancialReports { get; set; } = null!;
+    public DbSet<CashBoxDelivery> CashBoxDeliveries { get; set; } = null!;
+    public DbSet<CashierHandover> CashierHandovers { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -124,32 +127,50 @@ public class MembersHubContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // ExpenseCategory configuration
+        modelBuilder.Entity<ExpenseCategory>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.IconName).HasMaxLength(50);
+            entity.Property(e => e.ColorCode).HasMaxLength(7); // #RRGGBB
+
+            entity.HasIndex(e => e.Name).IsUnique();
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => e.DisplayOrder);
+        });
+
         // Expense configuration
         modelBuilder.Entity<Expense>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.ExpenseNumber).HasMaxLength(50).IsRequired();
             entity.Property(e => e.Amount).HasColumnType("decimal(10,2)");
-            entity.Property(e => e.Category).HasConversion<string>();
             entity.Property(e => e.Status).HasConversion<string>();
             entity.Property(e => e.Description).HasMaxLength(500).IsRequired();
             entity.Property(e => e.Vendor).HasMaxLength(200);
             entity.Property(e => e.ReceiptImagePath).HasMaxLength(500);
             entity.Property(e => e.ApprovalNotes).HasMaxLength(500);
-            
+
             entity.HasOne(e => e.Submitter)
                 .WithMany()
                 .HasForeignKey(e => e.SubmittedBy)
                 .OnDelete(DeleteBehavior.Restrict);
-            
+
             entity.HasOne(e => e.Approver)
                 .WithMany()
                 .HasForeignKey(e => e.ApprovedBy)
                 .OnDelete(DeleteBehavior.SetNull);
-                
+
+            entity.HasOne(e => e.Category)
+                .WithMany(c => c.Expenses)
+                .HasForeignKey(e => e.ExpenseCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             entity.HasIndex(e => e.ExpenseNumber).IsUnique();
             entity.HasIndex(e => e.Status);
-            entity.HasIndex(e => e.Category);
+            entity.HasIndex(e => e.ExpenseCategoryId);
             entity.HasIndex(e => new { e.SubmittedBy, e.Status });
         });
 
@@ -476,16 +497,68 @@ public class MembersHubContext : DbContext
         {
             entity.Property(e => e.Status).HasConversion<string>();
             entity.Property(e => e.TransactionReference).HasMaxLength(100);
-            
+
             entity.HasOne(e => e.Invoice)
                 .WithMany(i => i.Payments)
                 .HasForeignKey(e => e.InvoiceId)
                 .OnDelete(DeleteBehavior.SetNull);
-                
+
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.TransactionReference);
         });
 
+        // CashBoxDelivery configuration
+        modelBuilder.Entity<CashBoxDelivery>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DeliveryNumber).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.TotalCollections).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.TotalExpenses).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.NetAmount).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+
+            entity.HasOne(e => e.Collector)
+                .WithMany()
+                .HasForeignKey(e => e.CollectorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Receiver)
+                .WithMany()
+                .HasForeignKey(e => e.ReceivedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => e.DeliveryNumber).IsUnique();
+            entity.HasIndex(e => e.CollectorId);
+            entity.HasIndex(e => e.DeliveryDate);
+            entity.HasIndex(e => new { e.CollectorId, e.DeliveryDate });
+        });
+
+        // CashierHandover configuration
+        modelBuilder.Entity<CashierHandover>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TotalCollections).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.TotalExpenses).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.NetBalance).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.Status).HasConversion<string>();
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+
+            entity.HasOne(e => e.Cashier)
+                .WithMany()
+                .HasForeignKey(e => e.CashierId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.ReceivedBy)
+                .WithMany()
+                .HasForeignKey(e => e.ReceivedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => e.CashierId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.PeriodEndDate);
+            entity.HasIndex(e => new { e.CashierId, e.Status });
+            entity.HasIndex(e => new { e.CashierId, e.PeriodStartDate, e.PeriodEndDate });
+        });
 
         // Seed initial data
         SeedData(modelBuilder);
@@ -500,7 +573,8 @@ public class MembersHubContext : DbContext
             new MembershipType { Id = 3, Name = "Φοιτητές", MonthlyFee = 15, Description = "Φοιτητές με φοιτητική ταυτότητα", IsActive = true }
         );
 
-        // Seed users (password for all: Admin123!)
+        // Seed users (password for all: Aris100*)
+        // BCrypt hash generated with work factor 11
         modelBuilder.Entity<User>().HasData(
             new User
             {
@@ -510,7 +584,7 @@ public class MembersHubContext : DbContext
                 LastName = "Σκαμαγκάκης",
                 Email = "skamar@me.com",
                 Phone = "6900000001",
-                PasswordHash = "",
+                PasswordHash = "$2a$11$Oc/hGN4tb2JwuShFyQIDDuCg6b8loRTxHA1Qi.jL3gyZTWCPZ2fcK",
                 Role = UserRole.Admin,
                 IsActive = true,
                 CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -524,7 +598,7 @@ public class MembersHubContext : DbContext
                 LastName = "Καμαγάκης",
                 Email = "owner@membershub.gr",
                 Phone = "6900000002",
-                PasswordHash = "AQAAAAIAAYagAAAAEJvhJL5Yk1kqD1FzqC5YwR0N2o5nVfO7qJqZ+3YxD3X1qH7HqGrBqJqZ+3YxD3X1qA==",
+                PasswordHash = "$2a$11$Oc/hGN4tb2JwuShFyQIDDuCg6b8loRTxHA1Qi.jL3gyZTWCPZ2fcK",
                 Role = UserRole.Owner,
                 IsActive = true,
                 CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -538,7 +612,7 @@ public class MembersHubContext : DbContext
                 LastName = "Οικονόμου",
                 Email = "treasurer@membershub.gr",
                 Phone = "6900000003",
-                PasswordHash = "AQAAAAIAAYagAAAAEJvhJL5Yk1kqD1FzqC5YwR0N2o5nVfO7qJqZ+3YxD3X1qH7HqGrBqJqZ+3YxD3X1qA==",
+                PasswordHash = "$2a$11$Oc/hGN4tb2JwuShFyQIDDuCg6b8loRTxHA1Qi.jL3gyZTWCPZ2fcK",
                 Role = UserRole.Treasurer,
                 IsActive = true,
                 CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -555,7 +629,7 @@ public class MembersHubContext : DbContext
                 LastName = "Παπαδόπουλος",
                 Email = "giannis.papadopoulos@email.com",
                 Phone = "6911111111",
-                DateOfBirth = new DateTime(1985, 5, 15),
+                DateOfBirth = new DateTime(1985, 5, 15, 0, 0, 0, DateTimeKind.Utc),
                 MembershipTypeId = 1,
                 MemberNumber = "A001",
                 Status = MemberStatus.Active,
@@ -569,7 +643,7 @@ public class MembersHubContext : DbContext
                 LastName = "Καραγιάννη",
                 Email = "maria.karagianni@email.com",
                 Phone = "6922222222",
-                DateOfBirth = new DateTime(1990, 8, 20),
+                DateOfBirth = new DateTime(1990, 8, 20, 0, 0, 0, DateTimeKind.Utc),
                 MembershipTypeId = 1,
                 MemberNumber = "A002",
                 Status = MemberStatus.Active,
@@ -583,7 +657,7 @@ public class MembersHubContext : DbContext
                 LastName = "Γεωργίου",
                 Email = "nikos.georgiou@email.com",
                 Phone = "6933333333",
-                DateOfBirth = new DateTime(2005, 3, 10),
+                DateOfBirth = new DateTime(2005, 3, 10, 0, 0, 0, DateTimeKind.Utc),
                 MembershipTypeId = 2,
                 MemberNumber = "K001",
                 Status = MemberStatus.Active,
@@ -597,7 +671,7 @@ public class MembersHubContext : DbContext
                 LastName = "Δημητρίου",
                 Email = "eleni.dimitriou@student.uoa.gr",
                 Phone = "6944444444",
-                DateOfBirth = new DateTime(2002, 11, 25),
+                DateOfBirth = new DateTime(2002, 11, 25, 0, 0, 0, DateTimeKind.Utc),
                 MembershipTypeId = 3,
                 MemberNumber = "F001",
                 Status = MemberStatus.Active,
@@ -610,7 +684,7 @@ public class MembersHubContext : DbContext
                 FirstName = "Κώστας",
                 LastName = "Αντωνίου",
                 Phone = "6955555555",
-                DateOfBirth = new DateTime(1978, 12, 5),
+                DateOfBirth = new DateTime(1978, 12, 5, 0, 0, 0, DateTimeKind.Utc),
                 MembershipTypeId = 1,
                 MemberNumber = "A003",
                 Status = MemberStatus.Suspended,
@@ -629,7 +703,7 @@ public class MembersHubContext : DbContext
                 Year = 2025,
                 Month = 1,
                 Amount = 30,
-                DueDate = new DateTime(2025, 1, 31),
+                DueDate = new DateTime(2025, 1, 31, 0, 0, 0, DateTimeKind.Utc),
                 Status = SubscriptionStatus.Paid,
                 CreatedAt = new DateTime(2024, 12, 25, 0, 0, 0, DateTimeKind.Utc)
             },
@@ -640,7 +714,7 @@ public class MembersHubContext : DbContext
                 Year = 2025,
                 Month = 1,
                 Amount = 30,
-                DueDate = new DateTime(2025, 1, 31),
+                DueDate = new DateTime(2025, 1, 31, 0, 0, 0, DateTimeKind.Utc),
                 Status = SubscriptionStatus.Pending,
                 CreatedAt = new DateTime(2024, 12, 25, 0, 0, 0, DateTimeKind.Utc)
             },
@@ -651,7 +725,7 @@ public class MembersHubContext : DbContext
                 Year = 2025,
                 Month = 1,
                 Amount = 20,
-                DueDate = new DateTime(2025, 1, 31),
+                DueDate = new DateTime(2025, 1, 31, 0, 0, 0, DateTimeKind.Utc),
                 Status = SubscriptionStatus.Pending,
                 CreatedAt = new DateTime(2024, 12, 25, 0, 0, 0, DateTimeKind.Utc)
             },
@@ -662,7 +736,7 @@ public class MembersHubContext : DbContext
                 Year = 2025,
                 Month = 1,
                 Amount = 15,
-                DueDate = new DateTime(2025, 1, 31),
+                DueDate = new DateTime(2025, 1, 31, 0, 0, 0, DateTimeKind.Utc),
                 Status = SubscriptionStatus.Paid,
                 CreatedAt = new DateTime(2024, 12, 25, 0, 0, 0, DateTimeKind.Utc)
             }

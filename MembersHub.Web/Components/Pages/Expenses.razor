@@ -1,0 +1,431 @@
+@page "/expenses"
+@using Microsoft.AspNetCore.Authorization
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Web.Components.Dialogs
+@attribute [Authorize]
+@using MudBlazor
+@inject IExpenseService ExpenseService
+@inject IExpenseCategoryService ExpenseCategoryService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject ISessionService SessionService
+
+<PageTitle>Διαχείριση Εξόδων - MembersHub</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Color="Color.Primary">
+        💳 Διαχείριση Εξόδων
+    </MudText>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <!-- Header με στατιστικά και κουμπί προσθήκης -->
+        <div class="d-flex flex-column flex-sm-row justify-space-between align-center mb-4 gap-3">
+            <div class="d-flex flex-wrap gap-2 justify-center">
+                <MudBadge Content="@pendingCount" Color="Color.Warning" Overlap="true">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.HourglassEmpty">
+                        Εκκρεμή
+                    </MudButton>
+                </MudBadge>
+                <MudBadge Content="@approvedCount" Color="Color.Success" Overlap="true">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.CheckCircle">
+                        Εγκεκριμένα
+                    </MudButton>
+                </MudBadge>
+                <MudBadge Content="@rejectedCount" Color="Color.Error" Overlap="true">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Cancel">
+                        Απορριφθέντα
+                    </MudButton>
+                </MudBadge>
+            </div>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@OpenCreateDialog">
+                Νέο Έξοδο
+            </MudButton>
+        </div>
+
+        <!-- Search και Filters -->
+        <div class="d-flex flex-column flex-md-row gap-3 mb-4">
+            <MudTextField @bind-Value="searchString"
+                          Label="Αναζήτηση..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Class="flex-grow-1" />
+
+            <MudSelect @bind-Value="selectedCategoryId"
+                       Label="Κατηγορία"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem T="int?" Value="@((int?)null)">Όλες</MudSelectItem>
+                @foreach (var category in categories)
+                {
+                    <MudSelectItem T="int?" Value="@category.Id">
+                        @category.Name
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect @bind-Value="selectedStatus"
+                       Label="Κατάσταση"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem T="ExpenseStatus?" Value="@((ExpenseStatus?)null)">Όλες</MudSelectItem>
+                <MudSelectItem T="ExpenseStatus?" Value="@ExpenseStatus.Pending">Εκκρεμές</MudSelectItem>
+                <MudSelectItem T="ExpenseStatus?" Value="@ExpenseStatus.Approved">Εγκεκριμένο</MudSelectItem>
+                <MudSelectItem T="ExpenseStatus?" Value="@ExpenseStatus.Rejected">Απορριφθέν</MudSelectItem>
+                <MudSelectItem T="ExpenseStatus?" Value="@ExpenseStatus.Reimbursed">Αποζημιωμένο</MudSelectItem>
+            </MudSelect>
+        </div>
+
+        <!-- Desktop DataGrid -->
+        <MudHidden Breakpoint="Breakpoint.SmAndDown">
+            <MudDataGrid Items="@filteredExpenses"
+                         Dense="true"
+                         Hover="true"
+                         Bordered="true"
+                         Striped="true"
+                         Loading="@loading"
+                         LoadingProgressColor="Color.Primary">
+                <Columns>
+                    <PropertyColumn Property="x => x.ExpenseNumber" Title="Αριθμός" />
+                    <PropertyColumn Property="x => x.Date" Title="Ημερομηνία" Format="dd/MM/yyyy" />
+                    <TemplateColumn Title="Κατηγορία">
+                        <CellTemplate>
+                            @(context.Item.Category?.Name ?? "Δεν καθορίστηκε")
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.Amount" Title="Ποσό" Format="C2" />
+                    <PropertyColumn Property="x => x.Description" Title="Περιγραφή" />
+                    <PropertyColumn Property="x => x.Submitter.FullName" Title="Υποβλήθηκε από" />
+                    <TemplateColumn Title="Κατάσταση">
+                        <CellTemplate>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@GetStatusColor(context.Item.Status)">
+                                @GetStatusText(context.Item.Status)
+                            </MudChip>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Ενέργειες" Sortable="false">
+                        <CellTemplate>
+                            <div class="d-flex gap-2">
+                                @if (context.Item.Status == ExpenseStatus.Pending && CanEdit(context.Item))
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                   Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   Variant="Variant.Filled"
+                                                   OnClick="() => EditExpense(context.Item)"
+                                                   title="Επεξεργασία" />
+                                }
+                                @if (context.Item.Status == ExpenseStatus.Pending && CanApprove())
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Check"
+                                                   Size="Size.Small"
+                                                   Color="Color.Success"
+                                                   Variant="Variant.Filled"
+                                                   OnClick="() => ApproveExpense(context.Item)"
+                                                   title="Έγκριση" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   Variant="Variant.Filled"
+                                                   OnClick="() => RejectExpense(context.Item)"
+                                                   title="Απόρριψη" />
+                                }
+                                @if (context.Item.Status == ExpenseStatus.Pending && CanDelete(context.Item))
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   Variant="Variant.Filled"
+                                                   OnClick="() => DeleteExpense(context.Item)"
+                                                   title="Διαγραφή" />
+                                }
+                            </div>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudHidden>
+
+        <!-- Mobile Cards -->
+        <MudHidden Breakpoint="Breakpoint.MdAndUp">
+            <MudGrid>
+                @foreach (var expense in filteredExpenses)
+                {
+                    <MudItem xs="12">
+                        <MudCard Class="mb-3">
+                            <MudCardContent>
+                                <div class="d-flex justify-space-between align-center mb-2">
+                                    <MudText Typo="Typo.h6">@expense.ExpenseNumber</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(expense.Status)">
+                                        @GetStatusText(expense.Status)
+                                    </MudChip>
+                                </div>
+                                <MudText Typo="Typo.body2" Class="mb-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" /> @expense.Date.ToString("dd/MM/yyyy")
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mb-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" /> @(expense.Category?.Name ?? "Δεν καθορίστηκε")
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mb-1" Color="Color.Primary">
+                                    <MudIcon Icon="@Icons.Material.Filled.Euro" Size="Size.Small" /> €@expense.Amount.ToString("N2")
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mb-1">
+                                    @expense.Description
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Default">
+                                    Υποβλήθηκε από: @expense.Submitter.FullName
+                                </MudText>
+                            </MudCardContent>
+                            <MudCardActions>
+                                @if (expense.Status == ExpenseStatus.Pending && CanEdit(expense))
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                   Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   OnClick="() => EditExpense(expense)" />
+                                }
+                                @if (expense.Status == ExpenseStatus.Pending && CanApprove())
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Check"
+                                                   Size="Size.Small"
+                                                   Color="Color.Success"
+                                                   OnClick="() => ApproveExpense(expense)" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="() => RejectExpense(expense)" />
+                                }
+                                @if (expense.Status == ExpenseStatus.Pending && CanDelete(expense))
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="() => DeleteExpense(expense)" />
+                                }
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudHidden>
+
+        @if (!filteredExpenses.Any() && !loading)
+        {
+            <div class="text-center pa-8">
+                <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Large" Color="Color.Default" />
+                <MudText Typo="Typo.h6" Color="Color.Default" Class="mt-2">
+                    Δεν βρέθηκαν έξοδα με αυτά τα κριτήρια
+                </MudText>
+            </div>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<Expense> expenses = new();
+    private List<ExpenseCategory> categories = new();
+    private bool loading = true;
+    private User? currentUser;
+
+    private string searchString = "";
+    private int? selectedCategoryId = null;
+    private ExpenseStatus? selectedStatus = null;
+
+    private int pendingCount => expenses.Count(e => e.Status == ExpenseStatus.Pending);
+    private int approvedCount => expenses.Count(e => e.Status == ExpenseStatus.Approved);
+    private int rejectedCount => expenses.Count(e => e.Status == ExpenseStatus.Rejected);
+
+    private IEnumerable<Expense> filteredExpenses => expenses.Where(e =>
+        (string.IsNullOrWhiteSpace(searchString) ||
+         e.ExpenseNumber.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+         e.Description.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+         (e.Vendor?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false)) &&
+        (selectedCategoryId == null || e.ExpenseCategoryId == selectedCategoryId) &&
+        (selectedStatus == null || e.Status == selectedStatus)
+    ).OrderByDescending(e => e.Date);
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = await SessionService.GetCurrentUserAsync();
+        categories = await ExpenseCategoryService.GetAllCategoriesAsync();
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try
+        {
+            if (currentUser == null) return;
+
+            // Collectors see only their own expenses, Admins/Treasurers see all
+            if (CanApprove())
+            {
+                expenses = await ExpenseService.GetExpensesByStatusAsync(ExpenseStatus.Pending);
+                var approved = await ExpenseService.GetExpensesByStatusAsync(ExpenseStatus.Approved);
+                var rejected = await ExpenseService.GetExpensesByStatusAsync(ExpenseStatus.Rejected);
+                var reimbursed = await ExpenseService.GetExpensesByStatusAsync(ExpenseStatus.Reimbursed);
+                expenses = expenses.Concat(approved).Concat(rejected).Concat(reimbursed).ToList();
+            }
+            else
+            {
+                expenses = await ExpenseService.GetExpensesByUserAsync(currentUser.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης δεδομένων: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ExpenseDialog>("Νέο Έξοδο", options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task EditExpense(Expense expense)
+    {
+        var parameters = new DialogParameters<ExpenseDialog>
+        {
+            { x => x.ExistingExpense, expense }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ExpenseDialog>($"Επεξεργασία Εξόδου - {expense.ExpenseNumber}", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task ApproveExpense(Expense expense)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Έγκριση Εξόδου",
+            $"Είστε σίγουροι ότι θέλετε να εγκρίνετε το έξοδο '{expense.ExpenseNumber}' ποσού €{expense.Amount:N2};",
+            yesText: "Έγκριση",
+            cancelText: "Άκυρο");
+
+        if (result == true && currentUser != null)
+        {
+            try
+            {
+                await ExpenseService.ApproveExpenseAsync(expense.Id, currentUser.Id);
+                Snackbar.Add($"Το έξοδο {expense.ExpenseNumber} εγκρίθηκε επιτυχώς", Severity.Success);
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Σφάλμα έγκρισης: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task RejectExpense(Expense expense)
+    {
+        // TODO: Add a dialog to enter rejection reason
+        var reason = "Απορρίφθηκε από τον διαχειριστή";
+
+        if (currentUser != null)
+        {
+            try
+            {
+                await ExpenseService.RejectExpenseAsync(expense.Id, currentUser.Id, reason);
+                Snackbar.Add($"Το έξοδο {expense.ExpenseNumber} απορρίφθηκε", Severity.Success);
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Σφάλμα απόρριψης: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteExpense(Expense expense)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Διαγραφή Εξόδου",
+            $"Είστε σίγουροι ότι θέλετε να διαγράψετε το έξοδο '{expense.ExpenseNumber}';",
+            yesText: "Διαγραφή",
+            cancelText: "Άκυρο");
+
+        if (result == true)
+        {
+            try
+            {
+                await ExpenseService.DeleteExpenseAsync(expense.Id);
+                Snackbar.Add($"Το έξοδο {expense.ExpenseNumber} διαγράφηκε επιτυχώς", Severity.Success);
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Σφάλμα διαγραφής: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private bool CanApprove()
+    {
+        return currentUser?.Role == UserRole.Admin ||
+               currentUser?.Role == UserRole.Owner ||
+               currentUser?.Role == UserRole.Treasurer;
+    }
+
+    private bool CanEdit(Expense expense)
+    {
+        return currentUser?.Id == expense.SubmittedBy;
+    }
+
+    private bool CanDelete(Expense expense)
+    {
+        return currentUser?.Id == expense.SubmittedBy || CanApprove();
+    }
+
+    private Color GetStatusColor(ExpenseStatus status) => status switch
+    {
+        ExpenseStatus.Pending => Color.Warning,
+        ExpenseStatus.Approved => Color.Success,
+        ExpenseStatus.Rejected => Color.Error,
+        ExpenseStatus.Reimbursed => Color.Info,
+        _ => Color.Default
+    };
+
+    private string GetStatusText(ExpenseStatus status) => status switch
+    {
+        ExpenseStatus.Pending => "Εκκρεμές",
+        ExpenseStatus.Approved => "Εγκεκριμένο",
+        ExpenseStatus.Rejected => "Απορριφθέν",
+        ExpenseStatus.Reimbursed => "Αποζημιωμένο",
+        _ => status.ToString()
+    };
+}

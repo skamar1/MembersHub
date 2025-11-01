@@ -1,91 +1,290 @@
-@using MudBlazor
-@using Microsoft.AspNetCore.Components
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
 @using MembersHub.Web.Models
-@inject IDialogService DialogService
+@using Microsoft.EntityFrameworkCore
+@using MudBlazor
+@inject IDbContextFactory<MembersHubContext> ContextFactory
+@inject ISnackbar Snackbar
 
 <MudDialog>
     <DialogContent>
-        <MudContainer Class="pa-4">
-            <MudText Typo="Typo.h6" Class="mb-4">📅 Επιλέξτε Περίοδο για Δημιουργία Συνδρομών</MudText>
+        <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Info" Class="mb-4">
+                        <MudText Typo="Typo.body1">
+                            Θα δημιουργηθούν συνδρομές για όλα τα ενεργά μέλη για τον επιλεγμένο μήνα.
+                            Κάθε μέλος θα χρεωθεί με το ποσό της συνδρομής του.
+                        </MudText>
+                    </MudAlert>
+                </MudItem>
 
-            <MudAlert Severity="Severity.Info" Class="mb-4">
-                Θα δημιουργηθούν συνδρομές για όλα τα ενεργά μέλη με βάση τον τύπο συνδρομής που έχουν.
-            </MudAlert>
-
-            <MudGrid>
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="int" Label="Έτος" @bind-Value="selectedYear">
-                        @for (int year = DateTime.Now.Year - 1; year <= DateTime.Now.Year + 1; year++)
+                    <MudSelect T="int"
+                               Value="selectedYear"
+                               ValueChanged="OnYearChanged"
+                               Label="Έτος"
+                               Variant="Variant.Outlined">
+                        @foreach (var year in availableYears)
                         {
-                            <MudSelectItem Value="@year">@year</MudSelectItem>
+                            <MudSelectItem T="int" Value="@year">@year</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
+
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="int" Label="Μήνας" @bind-Value="selectedMonth">
-                        <MudSelectItem Value="1">Ιανουάριος</MudSelectItem>
-                        <MudSelectItem Value="2">Φεβρουάριος</MudSelectItem>
-                        <MudSelectItem Value="3">Μάρτιος</MudSelectItem>
-                        <MudSelectItem Value="4">Απρίλιος</MudSelectItem>
-                        <MudSelectItem Value="5">Μάιος</MudSelectItem>
-                        <MudSelectItem Value="6">Ιούνιος</MudSelectItem>
-                        <MudSelectItem Value="7">Ιούλιος</MudSelectItem>
-                        <MudSelectItem Value="8">Αύγουστος</MudSelectItem>
-                        <MudSelectItem Value="9">Σεπτέμβριος</MudSelectItem>
-                        <MudSelectItem Value="10">Οκτώβριος</MudSelectItem>
-                        <MudSelectItem Value="11">Νοέμβριος</MudSelectItem>
-                        <MudSelectItem Value="12">Δεκέμβριος</MudSelectItem>
+                    <MudSelect T="int"
+                               Value="selectedMonth"
+                               ValueChanged="OnMonthChanged"
+                               Label="Μήνας"
+                               Variant="Variant.Outlined">
+                        @foreach (var month in availableMonths)
+                        {
+                            <MudSelectItem T="int" Value="@month.Value">@month.Name</MudSelectItem>
+                        }
                     </MudSelect>
                 </MudItem>
-            </MudGrid>
 
-            <MudText Typo="Typo.body2" Class="mt-4" Color="Color.Secondary">
-                Επιλεγμένη περίοδος: <strong>@GetMonthName(selectedMonth) @selectedYear</strong>
-            </MudText>
-        </MudContainer>
+                @if (existingSubscriptionsCount > 0)
+                {
+                    <MudItem xs="12">
+                        @if (existingSubscriptionsCount >= activeMembers.Count && activeMembers.Any())
+                        {
+                            <MudAlert Severity="Severity.Error">
+                                <MudText Typo="Typo.body1">
+                                    <MudIcon Icon="Icons.Material.Filled.Error" Class="mr-2" />
+                                    Όλα τα ενεργά μέλη (@activeMembers.Count) έχουν ήδη συνδρομές για @GetMonthName(selectedMonth) @selectedYear.
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mt-2">
+                                    Δεν είναι δυνατή η δημιουργία νέων συνδρομών για αυτό το μήνα.
+                                </MudText>
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Warning">
+                                <MudText Typo="Typo.body1">
+                                    <MudIcon Icon="Icons.Material.Filled.Warning" Class="mr-2" />
+                                    Υπάρχουν ήδη @existingSubscriptionsCount συνδρομές για @GetMonthName(selectedMonth) @selectedYear.
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mt-2">
+                                    Θα δημιουργηθούν μόνο οι συνδρομές που λείπουν (@(activeMembers.Count - existingSubscriptionsCount) μέλη).
+                                </MudText>
+                            </MudAlert>
+                        }
+                    </MudItem>
+                }
+
+                @if (activeMembers.Any())
+                {
+                    <MudItem xs="12">
+                        @{
+                            var membersToCharge = activeMembers.Count - existingSubscriptionsCount;
+                        }
+                        <MudText Typo="Typo.h6" Class="mb-2">
+                            @if (membersToCharge > 0)
+                            {
+                                <MudText>Προεπισκόπηση (@membersToCharge μέλη προς χρέωση)</MudText>
+                            }
+                            else
+                            {
+                                <MudText Color="Color.Secondary">Όλα τα μέλη έχουν ήδη συνδρομές για αυτό το μήνα</MudText>
+                            }
+                        </MudText>
+
+                        @if (previewMembers.Any())
+                        {
+                            <MudDataGrid T="Member" Items="@previewMembers"
+                                         Dense="true"
+                                         Height="300px"
+                                         Virtualize="true">
+                                <Columns>
+                                    <PropertyColumn Property="x => x.MemberNumber" Title="Αριθμός" />
+                                    <PropertyColumn Property="x => x.FullName" Title="Όνομα" />
+                                    <PropertyColumn Property="x => x.MembershipType.Name" Title="Τύπος" />
+                                    <PropertyColumn Property="x => x.MembershipType.MonthlyFee" Title="Ποσό" Format="C2" />
+                                </Columns>
+                            </MudDataGrid>
+                        }
+                        else if (membersToCharge > 0)
+                        {
+                            <MudAlert Severity="Severity.Info">
+                                Φορτώνονται τα στοιχεία των μελών...
+                            </MudAlert>
+                        }
+                    </MudItem>
+                }
+        </MudGrid>
     </DialogContent>
-
     <DialogActions>
-        <MudButton OnClick="Cancel">Ακύρωση</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">
-            <MudIcon Icon="Icons.Material.Filled.Add" Class="mr-2" />
-            Δημιουργία Συνδρομών
+        <MudButton OnClick="Cancel">Άκυρο</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Generate"
+                   Disabled="@(existingSubscriptionsCount >= activeMembers.Count && activeMembers.Any())">
+            @if (existingSubscriptionsCount >= activeMembers.Count && activeMembers.Any())
+            {
+                <MudText>Συνδρομές Υπάρχουν Ήδη</MudText>
+            }
+            else
+            {
+                <MudText>Δημιουργία Συνδρομών</MudText>
+            }
         </MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
-    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [CascadingParameter]
+    public IMudDialogInstance MudDialog { get; set; } = null!;
 
-    [Parameter] public int Year { get; set; } = DateTime.Now.Year;
-    [Parameter] public int Month { get; set; } = DateTime.Now.Month;
+    [Parameter]
+    public int Year { get; set; } = DateTime.Now.Year;
 
-    private int selectedYear;
-    private int selectedMonth;
+    [Parameter]
+    public int Month { get; set; } = DateTime.Now.Month;
 
-    protected override void OnInitialized()
+    private int selectedYear = DateTime.Now.Year;
+    private int selectedMonth = DateTime.Now.Month;
+
+    private List<Member> activeMembers = new();
+    private List<Member> previewMembers = new();
+    private int existingSubscriptionsCount = 0;
+
+    // Λίστες για τα dropdowns
+    private List<int> availableYears = new();
+    private List<(int Value, string Name)> availableMonths = new()
     {
+        (1, "Ιανουάριος"),
+        (2, "Φεβρουάριος"),
+        (3, "Μάρτιος"),
+        (4, "Απρίλιος"),
+        (5, "Μάιος"),
+        (6, "Ιούνιος"),
+        (7, "Ιούλιος"),
+        (8, "Αύγουστος"),
+        (9, "Σεπτέμβριος"),
+        (10, "Οκτώβριος"),
+        (11, "Νοέμβριος"),
+        (12, "Δεκέμβριος")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Αρχικοποίηση λίστας ετών (τρέχον έτος ± 1)
+        var currentYear = DateTime.Now.Year;
+        availableYears = new List<int> { currentYear - 1, currentYear, currentYear + 1 };
+
         selectedYear = Year;
         selectedMonth = Month;
+
+        await LoadActiveMembers();
+        await CheckExistingSubscriptions();
     }
 
-    void Submit()
+    private async Task OnYearChanged(int newYear)
     {
-        var result = new GenerateSubscriptionsResult
+        selectedYear = newYear;
+        await CheckExistingSubscriptions();
+    }
+
+    private async Task OnMonthChanged(int newMonth)
+    {
+        selectedMonth = newMonth;
+        await CheckExistingSubscriptions();
+    }
+
+    private async Task LoadActiveMembers()
+    {
+        try
         {
-            Year = selectedYear,
-            Month = selectedMonth
-        };
-        MudDialog.Close(DialogResult.Ok(result));
+            using var context = ContextFactory.CreateDbContext();
+            activeMembers = await context.Members
+                .Include(m => m.MembershipType)
+                .Where(m => m.Status == MemberStatus.Active)
+                .OrderBy(m => m.MemberNumber)
+                .ToListAsync();
+
+            // Ενημερώνουμε την προεπισκόπηση βάσει των υπαρχουσών συνδρομών
+            await UpdatePreviewMembers();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης μελών: {ex.Message}", Severity.Error);
+        }
     }
 
-    void Cancel() => MudDialog.Cancel();
-
-    private string GetMonthName(int month)
+    private async Task CheckExistingSubscriptions()
     {
-        var monthNames = new[] { "", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος",
-                                "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος" };
-        return month >= 1 && month <= 12 ? monthNames[month] : month.ToString();
-    }
-}
+        try
+        {
+            using var context = ContextFactory.CreateDbContext();
 
+            // Μετράμε τις υπάρχουσες συνδρομές για αυτό το μήνα/έτος
+            existingSubscriptionsCount = await context.Subscriptions
+                .CountAsync(s => s.Year == selectedYear && s.Month == selectedMonth);
+
+            // Ενημερώνουμε τα μέλη που θα εμφανίζονται στην προεπισκόπηση
+            await UpdatePreviewMembers();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα ελέγχου υπαρχουσών συνδρομών: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task UpdatePreviewMembers()
+    {
+        try
+        {
+            using var context = ContextFactory.CreateDbContext();
+
+            // Παίρνουμε τα IDs των μελών που έχουν ήδη συνδρομές για αυτό το μήνα
+            var existingMemberIds = await context.Subscriptions
+                .Where(s => s.Year == selectedYear && s.Month == selectedMonth)
+                .Select(s => s.MemberId)
+                .ToListAsync();
+
+            // Φιλτράρουμε τα ενεργά μέλη που ΔΕΝ έχουν συνδρομές για αυτό το μήνα
+            var membersWithoutSubscriptions = activeMembers
+                .Where(m => !existingMemberIds.Contains(m.Id))
+                .ToList();
+
+            // Εμφανίζουμε τα πρώτα 10 από αυτά που θα χρεωθούν
+            previewMembers = membersWithoutSubscriptions.Take(10).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα ενημέρωσης προεπισκόπησης: {ex.Message}", Severity.Error);
+        }
+    }
+
+
+    private void Generate()
+    {
+        // Just return the selected year and month to let the parent component handle the business logic
+        MudDialog.Close(DialogResult.Ok(new GenerateSubscriptionsResult { Year = selectedYear, Month = selectedMonth }));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private string GetMonthName(int month) => month switch
+    {
+        1 => "Ιανουάριος",
+        2 => "Φεβρουάριος",
+        3 => "Μάρτιος",
+        4 => "Απρίλιος",
+        5 => "Μάιος",
+        6 => "Ιούνιος",
+        7 => "Ιούλιος",
+        8 => "Αύγουστος",
+        9 => "Σεπτέμβριος",
+        10 => "Οκτώβριος",
+        11 => "Νοέμβριος",
+        12 => "Δεκέμβριος",
+        _ => month.ToString()
+    };
+}

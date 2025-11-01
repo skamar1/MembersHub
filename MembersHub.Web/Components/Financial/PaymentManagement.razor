@@ -5,12 +5,13 @@
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
-@inject MembersHubContext Context
+@inject IDbContextFactory<MembersHubContext> ContextFactory
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject ISubscriptionService SubscriptionService
 @inject IPaymentService PaymentService
 @inject IDialogService DialogService
+@inject ISessionService SessionService
 @attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
 
 @code {
@@ -23,13 +24,13 @@
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
     <div class="d-flex justify-space-between align-center mb-6">
         <div>
-            <MudText Typo="Typo.h4">💳 Διαχείριση Πληρωμών</MudText>
+            <MudText Typo="Typo.h4">💳 Διαχείριση Εισπράξεων</MudText>
             @if (MemberId.HasValue && selectedMember != null)
             {
                 <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
-                    Πληρωμές για: <strong>@selectedMember.FullName</strong>
+                    Εισπράξεις για: <strong>@selectedMember.FullName</strong>
                     <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/financial/payments"))" Class="ml-2">
-                        Όλες οι πληρωμές
+                        Όλες οι εισπράξεις
                     </MudButton>
                 </MudText>
             }
@@ -37,7 +38,7 @@
         <MudButtonGroup Variant="Variant.Filled">
             <MudButton Color="Color.Primary" OnClick="OpenNewPaymentDialog">
                 <MudIcon Icon="Icons.Material.Filled.Add" Class="mr-2" />
-                Νέα Πληρωμή
+                Νέα Είσπραξη
             </MudButton>
             <MudButton Color="Color.Secondary" OnClick="ShowPendingSubscriptions">
                 <MudIcon Icon="Icons.Material.Filled.Schedule" Class="mr-2" />
@@ -121,7 +122,7 @@
                 <MudCardContent Class="text-center">
                     <MudIcon Icon="Icons.Material.Filled.Payments" Color="Color.Primary" Size="Size.Large" />
                     <MudText Typo="Typo.h6" Class="mt-2">@payments.Count</MudText>
-                    <MudText Typo="Typo.body2">Συνολικές Πληρωμές</MudText>
+                    <MudText Typo="Typo.body2">Συνολικές Εισπράξεις</MudText>
                 </MudCardContent>
             </MudCard>
         </MudItem>
@@ -140,7 +141,7 @@
     <MudCard Elevation="3">
         <MudCardHeader>
             <CardHeaderContent>
-                <MudText Typo="Typo.h6">Πληρωμές</MudText>
+                <MudText Typo="Typo.h6">Εισπράξεις</MudText>
             </CardHeaderContent>
         </MudCardHeader>
         <MudCardContent Class="pa-0">
@@ -175,9 +176,11 @@
     private decimal quickPaymentAmount = 0;
     private PaymentMethod quickPaymentMethod = PaymentMethod.Cash;
     private List<Subscription> memberPendingSubscriptions = new();
+    private User? currentUser;
 
     protected override async Task OnInitializedAsync()
     {
+        currentUser = await SessionService.GetCurrentUserAsync();
         await LoadPayments();
         await LoadMembers();
 
@@ -197,7 +200,8 @@
         loading = true;
         try
         {
-            var query = Context.Payments
+            using var context = ContextFactory.CreateDbContext();
+            var query = context.Payments
                 .Include(p => p.Member)
                 .Include(p => p.Collector)
                 .Include(p => p.Subscription)
@@ -207,6 +211,12 @@
             if (MemberId.HasValue)
             {
                 query = query.Where(p => p.MemberId == MemberId.Value);
+            }
+
+            // Filter by CollectorId for Treasurer role - they should only see their own collections
+            if (currentUser != null && currentUser.Role == UserRole.Treasurer)
+            {
+                query = query.Where(p => p.CollectorId == currentUser.Id);
             }
 
             payments = await query
@@ -228,7 +238,8 @@
     {
         try
         {
-            allMembers = await Context.Members
+            using var context = ContextFactory.CreateDbContext();
+            allMembers = await context.Members
                 .Where(m => m.Status == MemberStatus.Active)
                 .OrderBy(m => m.LastName)
                 .ThenBy(m => m.FirstName)
@@ -269,7 +280,7 @@
 
     private async Task ProcessQuickPayment()
     {
-        if (selectedMember == null || quickPaymentAmount <= 0)
+        if (selectedMember == null || quickPaymentAmount <= 0 || currentUser == null)
             return;
 
         try
@@ -281,12 +292,13 @@
                 PaymentDate = DateTime.Now,
                 PaymentMethod = quickPaymentMethod,
                 Status = PaymentStatus.Confirmed,
+                CollectorId = currentUser.Id,
                 Notes = "Εισπραξη από ταμείο"
             };
 
             await PaymentService.CreatePaymentAsync(payment);
 
-            Snackbar.Add($"Η πληρωμή €{quickPaymentAmount:N2} καταχωρήθηκε επιτυχώς για τον/την {selectedMember.FullName}!", Severity.Success);
+            Snackbar.Add($"Η είσπραξη €{quickPaymentAmount:N2} καταχωρήθηκε επιτυχώς για τον/την {selectedMember.FullName}!", Severity.Success);
 
             // Reset form
             selectedMember = null;
@@ -297,7 +309,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Σφάλμα κατά την καταχώρηση πληρωμής: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Σφάλμα κατά την καταχώρηση είσπραξης: {ex.Message}", Severity.Error);
         }
     }
 

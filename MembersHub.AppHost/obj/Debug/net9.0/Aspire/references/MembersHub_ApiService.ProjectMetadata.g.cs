@@ -2,10 +2,18 @@
 
 namespace Projects;
 
+#pragma warning disable CS8981 // The type name only contains lower-cased ascii characters. Such names may become reserved for the language.
+/// <summary>
+/// Metadata for the MembersHub_ApiService project.
+/// </summary>
 [global::System.CodeDom.Compiler.GeneratedCode("Aspire.Hosting", null)]
 [global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification = "Generated code.")]
 [global::System.Diagnostics.DebuggerDisplay("Type = {GetType().Name,nq}, ProjectPath = {ProjectPath}")]
 public class MembersHub_ApiService : global::Aspire.Hosting.IProjectMetadata
+#pragma warning restore CS8981
 {
+    /// <summary>
+    /// The path to the MembersHub_ApiService project.
+    /// </summary>
     public string ProjectPath => """/Users/arisskamagakis/1Projects/MembersHub/MembersHub.ApiService/MembersHub.ApiService.csproj""";
 }

@@ -1,0 +1,268 @@
+@page "/handover-history"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@inject ICashierHandoverService HandoverService
+@inject ISessionService SessionService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
+
+<PageTitle>Ιστορικό Παραδόσεων - MembersHub</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <div class="d-flex justify-space-between align-center mb-6">
+        <MudText Typo="Typo.h4">📋 Ιστορικό Παραδόσεων Ταμείου</MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="@(() => Navigation.NavigateTo("/cashier-handover"))">
+            Επιστροφή
+        </MudButton>
+    </div>
+
+    @if (loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudCard Elevation="3">
+            <MudCardContent>
+                <MudDataGrid T="CashierHandover"
+                             Items="@handovers"
+                             Filterable="true"
+                             SortMode="@SortMode.Multiple"
+                             Hover="true"
+                             Dense="true"
+                             RowsPerPage="15">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Id" Title="ID" />
+
+                        <TemplateColumn Title="Ταμείας" Sortable="true">
+                            <CellTemplate>
+                                @context.Item.Cashier.FullName
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                        <TemplateColumn Title="Περίοδος" Sortable="true">
+                            <CellTemplate>
+                                <MudText Typo="Typo.body2">
+                                    @context.Item.PeriodStartDate.ToString("dd/MM/yyyy")
+                                </MudText>
+                                <MudText Typo="Typo.caption">
+                                    έως @context.Item.PeriodEndDate.ToString("dd/MM/yyyy")
+                                </MudText>
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                        <TemplateColumn Title="Εισπράξεις" Sortable="true">
+                            <CellTemplate>
+                                <MudText Color="Color.Success" Typo="Typo.body2">
+                                    €@context.Item.TotalCollections.ToString("N2")
+                                </MudText>
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                        <TemplateColumn Title="Έξοδα" Sortable="true">
+                            <CellTemplate>
+                                <MudText Color="Color.Error" Typo="Typo.body2">
+                                    €@context.Item.TotalExpenses.ToString("N2")
+                                </MudText>
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                        <TemplateColumn Title="Καθαρό Υπόλοιπο" Sortable="true">
+                            <CellTemplate>
+                                <MudText Color="@(context.Item.NetBalance >= 0 ? Color.Primary : Color.Error)"
+                                         Typo="Typo.body1"
+                                         Style="font-weight: 600;">
+                                    €@context.Item.NetBalance.ToString("N2")
+                                </MudText>
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                        <TemplateColumn Title="Κατάσταση" Sortable="true">
+                            <CellTemplate>
+                                @switch (context.Item.Status)
+                                {
+                                    case HandoverStatus.Pending:
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Schedule">
+                                            Εκκρεμεί
+                                        </MudChip>
+                                        break;
+                                    case HandoverStatus.Confirmed:
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">
+                                            Επιβεβαιώθηκε
+                                        </MudChip>
+                                        break;
+                                    case HandoverStatus.Rejected:
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Cancel">
+                                            Απορρίφθηκε
+                                        </MudChip>
+                                        break;
+                                }
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                        <TemplateColumn Title="Παραλήπτης">
+                            <CellTemplate>
+                                @if (context.Item.ReceivedBy != null)
+                                {
+                                    <MudText Typo="Typo.body2">@context.Item.ReceivedBy.FullName</MudText>
+                                    @if (context.Item.ConfirmedDate.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption">
+                                            @context.Item.ConfirmedDate.Value.ToString("dd/MM/yyyy HH:mm")
+                                        </MudText>
+                                    }
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">-</MudText>
+                                }
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                        <TemplateColumn Title="Ενέργειες">
+                            <CellTemplate>
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                               Color="Color.Primary"
+                                               Size="Size.Small"
+                                               OnClick="@(() => ViewHandoverDetails(context.Item))" />
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                    <PagerContent>
+                        <MudDataGridPager T="CashierHandover" />
+                    </PagerContent>
+                </MudDataGrid>
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Summary Statistics -->
+        @if (handovers.Any())
+        {
+            <MudGrid Class="mt-6">
+                <MudItem xs="12" md="3">
+                    <MudCard Elevation="2">
+                        <MudCardContent Class="text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Primary" Size="Size.Large" />
+                            <MudText Typo="Typo.h6" Class="mt-2">@handovers.Count</MudText>
+                            <MudText Typo="Typo.body2">Συνολικές Παραδόσεις</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudCard Elevation="2">
+                        <MudCardContent Class="text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Large" />
+                            <MudText Typo="Typo.h6" Class="mt-2">
+                                €@handovers.Sum(h => h.TotalCollections).ToString("N2")
+                            </MudText>
+                            <MudText Typo="Typo.body2">Σύνολο Εισπράξεων</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudCard Elevation="2">
+                        <MudCardContent Class="text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Color="Color.Error" Size="Size.Large" />
+                            <MudText Typo="Typo.h6" Class="mt-2">
+                                €@handovers.Sum(h => h.TotalExpenses).ToString("N2")
+                            </MudText>
+                            <MudText Typo="Typo.body2">Σύνολο Εξόδων</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudCard Elevation="2">
+                        <MudCardContent Class="text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="Color.Info" Size="Size.Large" />
+                            <MudText Typo="Typo.h6" Class="mt-2">
+                                €@handovers.Sum(h => h.NetBalance).ToString("N2")
+                            </MudText>
+                            <MudText Typo="Typo.body2">Καθαρό Σύνολο</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        }
+    }
+</MudContainer>
+
+@code {
+    private User? currentUser;
+    private bool loading = true;
+    private List<CashierHandover> handovers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = await SessionService.GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadHandovers();
+    }
+
+    private async Task LoadHandovers()
+    {
+        loading = true;
+        try
+        {
+            if (currentUser != null)
+            {
+                // Admin/Owner can see all handovers, Treasurer sees only their own
+                if (currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner)
+                {
+                    handovers = await HandoverService.GetAllHandoversAsync();
+                }
+                else
+                {
+                    handovers = await HandoverService.GetCashierHandoversAsync(currentUser.Id);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης ιστορικού: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task ViewHandoverDetails(CashierHandover handover)
+    {
+        try
+        {
+            var transactions = await HandoverService.GetHandoverTransactionsAsync(handover.Id);
+
+            var message = $"Παράδοση #{handover.Id}\n" +
+                         $"Ταμείας: {handover.Cashier.FullName}\n" +
+                         $"Περίοδος: {handover.PeriodStartDate:dd/MM/yyyy} - {handover.PeriodEndDate:dd/MM/yyyy}\n\n" +
+                         $"Εισπράξεις: {transactions.Payments.Count} ({handover.TotalCollections:C2})\n" +
+                         $"Έξοδα: {transactions.Expenses.Count} ({handover.TotalExpenses:C2})\n" +
+                         $"Καθαρό: {handover.NetBalance:C2}\n\n";
+
+            if (!string.IsNullOrWhiteSpace(handover.Notes))
+            {
+                message += $"Σημειώσεις:\n{handover.Notes}";
+            }
+
+            await DialogService.ShowMessageBox(
+                "Λεπτομέρειες Παράδοσης",
+                message,
+                yesText: "OK");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+    }
+}

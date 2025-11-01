@@ -1,0 +1,504 @@
+@page "/financial/member-subscription-status"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@inject IDbContextFactory<MembersHubContext> ContextFactory
+@inject ISnackbar Snackbar
+@inject ISessionService SessionService
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
+
+<PageTitle>Κατάσταση Συνδρομών Μελών - MembersHub</PageTitle>
+
+<style>
+    .subscription-table {
+        font-size: 0.85rem;
+    }
+
+    .subscription-table th {
+        background-color: #f5f5f5;
+        font-weight: 600;
+        text-align: center;
+        padding: 8px 4px;
+        border: 1px solid #ddd;
+        white-space: nowrap;
+    }
+
+    .subscription-table td {
+        text-align: center;
+        padding: 8px 4px;
+        border: 1px solid #ddd;
+    }
+
+    .member-name-cell {
+        text-align: left !important;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .status-paid {
+        background-color: white;
+        color: black;
+    }
+
+    .status-unpaid {
+        background-color: #2196F3;
+        color: white;
+        font-weight: 500;
+    }
+
+    .status-overpaid {
+        background-color: #9E9E9E;
+        color: white;
+    }
+
+    .status-stopped {
+        background-color: #F44336;
+        color: white;
+    }
+
+    .status-future {
+        background-color: #FFC107;
+        color: black;
+    }
+
+    .status-empty {
+        background-color: #f9f9f9;
+        color: #ccc;
+    }
+
+    .total-column {
+        background-color: #e3f2fd;
+        font-weight: 600;
+    }
+
+    @@media print {
+        .no-print {
+            display: none !important;
+        }
+
+        .subscription-table {
+            font-size: 0.7rem;
+        }
+
+        .subscription-table th,
+        .subscription-table td {
+            padding: 4px 2px;
+        }
+    }
+</style>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <div class="d-flex justify-space-between align-center mb-4 no-print">
+        <MudText Typo="Typo.h4">📊 Κατάσταση Συνδρομών Μελών</MudText>
+        <MudButtonGroup>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Print"
+                       OnClick="@(() => JSRuntime.InvokeVoidAsync("window.print"))">
+                Εκτύπωση
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="LoadData">
+                Ανανέωση
+            </MudButton>
+        </MudButtonGroup>
+    </div>
+
+    <!-- Date Range Selection -->
+    <MudCard Class="mb-4 no-print">
+        <MudCardContent>
+            <MudGrid>
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Από"
+                                   @bind-Date="startDate"
+                                   DateFormat="MM/yyyy"
+                                   OpenTo="OpenTo.Month"
+                                   FixMonth="@startDate?.Month"
+                                   FixYear="@startDate?.Year" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Έως"
+                                   @bind-Date="endDate"
+                                   DateFormat="MM/yyyy"
+                                   OpenTo="OpenTo.Month"
+                                   FixMonth="@endDate?.Month"
+                                   FixYear="@endDate?.Year" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               FullWidth="true"
+                               OnClick="LoadData"
+                               Class="mt-3">
+                        Εφαρμογή
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Legend -->
+    <MudPaper Class="pa-3 mb-4 no-print" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-2">Υπόμνημα Χρωμάτων:</MudText>
+        <MudGrid>
+            <MudItem xs="6" sm="4" md="2">
+                <MudChip T="string" Color="Color.Default" Style="background-color: white; border: 1px solid #ddd;">Πληρωμένο</MudChip>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudChip T="string" Style="background-color: #2196F3; color: white;">Εκκρεμεί</MudChip>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudChip T="string" Style="background-color: #9E9E9E; color: white;">Προπληρωμή</MudChip>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudChip T="string" Style="background-color: #F44336; color: white;">Διακοπή</MudChip>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudChip T="string" Style="background-color: #FFC107; color: black;">Μελλοντικό</MudChip>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (memberStatusData.Any())
+    {
+        <MudPaper Elevation="3" Class="pa-0">
+            <div style="overflow-x: auto;">
+                <table class="subscription-table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 50px;">Α/Α</th>
+                            <th style="min-width: 80px;">Τμήμα</th>
+                            <th style="min-width: 200px;">Επώνυμο Όνομα</th>
+                            @foreach (var month in monthColumns)
+                            {
+                                <th style="min-width: 60px;">@month.ShortName</th>
+                            }
+                            <th style="min-width: 80px;">Σύνολο</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            int rowNumber = 1;
+                        }
+                        @foreach (var memberStatus in memberStatusData)
+                        {
+                            <tr>
+                                <td>@rowNumber</td>
+                                <td>@memberStatus.Department</td>
+                                <td class="member-name-cell">@memberStatus.FullName</td>
+                                @foreach (var month in monthColumns)
+                                {
+                                    var status = memberStatus.MonthlyStatus.FirstOrDefault(m => m.Year == month.Year && m.Month == month.Month);
+                                    <td class="@GetStatusClass(status)">
+                                        @if (status != null && status.Amount > 0)
+                                        {
+                                            @status.Amount.ToString("N0")
+                                        }
+                                    </td>
+                                }
+                                <td class="total-column">@memberStatus.TotalPaid.ToString("N0")</td>
+                            </tr>
+                            rowNumber++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </MudPaper>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info">Δεν βρέθηκαν δεδομένα για το επιλεγμένο χρονικό διάστημα.</MudAlert>
+    }
+</MudContainer>
+
+@code {
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+
+    private bool loading = true;
+    private DateTime? startDate = new DateTime(DateTime.Now.Year, 1, 1);
+    private DateTime? endDate = DateTime.Now;
+    private List<MonthColumn> monthColumns = new();
+    private List<MemberSubscriptionStatusData> memberStatusData = new();
+
+    public class MonthColumn
+    {
+        public int Year { get; set; }
+        public int Month { get; set; }
+        public string ShortName { get; set; } = "";
+        public string FullName { get; set; } = "";
+    }
+
+    public class MonthlyStatusInfo
+    {
+        public int Year { get; set; }
+        public int Month { get; set; }
+        public decimal Amount { get; set; }
+        public SubscriptionStatusType Status { get; set; }
+    }
+
+    public enum SubscriptionStatusType
+    {
+        Empty,          // Δεν υπάρχει συνδρομή
+        Paid,           // Πληρωμένο κανονικά
+        Unpaid,         // Εκκρεμεί πληρωμή
+        Overpaid,       // Προπληρωμή (πλήρωσε για πολλούς μήνες)
+        Stopped,        // Διακοπή συνδρομής
+        Future          // Μελλοντική συνδρομή (δεν είχε πριν)
+    }
+
+    public class MemberSubscriptionStatusData
+    {
+        public int MemberId { get; set; }
+        public string FullName { get; set; } = "";
+        public string Department { get; set; } = "";
+        public List<MonthlyStatusInfo> MonthlyStatus { get; set; } = new();
+        public decimal TotalPaid { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var currentUser = await SessionService.GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try
+        {
+            if (startDate == null || endDate == null)
+            {
+                Snackbar.Add("Παρακαλώ επιλέξτε χρονικό διάστημα", Severity.Warning);
+                return;
+            }
+
+            // Generate month columns
+            GenerateMonthColumns();
+
+            using var context = ContextFactory.CreateDbContext();
+
+            // Get all active members
+            var members = await context.Members
+                .Where(m => m.Status == MemberStatus.Active)
+                .OrderBy(m => m.LastName)
+                .ThenBy(m => m.FirstName)
+                .ToListAsync();
+
+            // Get all subscriptions in date range
+            var subscriptions = await context.Subscriptions
+                .Include(s => s.Member)
+                .Where(s => (s.Year > startDate.Value.Year || (s.Year == startDate.Value.Year && s.Month >= startDate.Value.Month)) &&
+                           (s.Year < endDate.Value.Year || (s.Year == endDate.Value.Year && s.Month <= endDate.Value.Month)))
+                .ToListAsync();
+
+            // Get all payments in date range with their subscription allocations
+            var payments = await context.Payments
+                .Where(p => p.Status == PaymentStatus.Confirmed &&
+                           p.PaymentDate >= startDate.Value &&
+                           p.PaymentDate <= endDate.Value)
+                .ToListAsync();
+
+            memberStatusData = new List<MemberSubscriptionStatusData>();
+
+            foreach (var member in members)
+            {
+                var memberSubscriptions = subscriptions.Where(s => s.MemberId == member.Id).ToList();
+
+                // Skip members with no subscriptions in this period
+                if (!memberSubscriptions.Any())
+                    continue;
+
+                var memberData = new MemberSubscriptionStatusData
+                {
+                    MemberId = member.Id,
+                    FullName = $"{member.LastName} {member.FirstName}",
+                    Department = member.MemberNumber.StartsWith("VA") ? "VA" :
+                                member.MemberNumber.StartsWith("VAR") ? "VAR" :
+                                member.MemberNumber.StartsWith("TE") ? "TE" : "N/A",
+                    MonthlyStatus = new List<MonthlyStatusInfo>()
+                };
+
+                decimal totalPaid = 0;
+
+                foreach (var monthCol in monthColumns)
+                {
+                    var subscription = memberSubscriptions
+                        .FirstOrDefault(s => s.Year == monthCol.Year && s.Month == monthCol.Month);
+
+                    if (subscription != null)
+                    {
+                        var status = DetermineSubscriptionStatus(
+                            subscription,
+                            memberSubscriptions,
+                            payments.Where(p => p.MemberId == member.Id).ToList(),
+                            monthCol);
+
+                        memberData.MonthlyStatus.Add(new MonthlyStatusInfo
+                        {
+                            Year = monthCol.Year,
+                            Month = monthCol.Month,
+                            Amount = subscription.Amount,
+                            Status = status
+                        });
+
+                        if (subscription.Status == SubscriptionStatus.Paid)
+                        {
+                            totalPaid += subscription.Amount;
+                        }
+                    }
+                    else
+                    {
+                        // Check if this is a gap before future subscriptions (yellow)
+                        var hasFutureSubscriptions = memberSubscriptions.Any(s =>
+                            s.Year > monthCol.Year || (s.Year == monthCol.Year && s.Month > monthCol.Month));
+
+                        var hasPastSubscriptions = memberSubscriptions.Any(s =>
+                            s.Year < monthCol.Year || (s.Year == monthCol.Year && s.Month < monthCol.Month));
+
+                        if (hasFutureSubscriptions && hasPastSubscriptions)
+                        {
+                            memberData.MonthlyStatus.Add(new MonthlyStatusInfo
+                            {
+                                Year = monthCol.Year,
+                                Month = monthCol.Month,
+                                Amount = 0,
+                                Status = SubscriptionStatusType.Future
+                            });
+                        }
+                        else
+                        {
+                            memberData.MonthlyStatus.Add(new MonthlyStatusInfo
+                            {
+                                Year = monthCol.Year,
+                                Month = monthCol.Month,
+                                Amount = 0,
+                                Status = SubscriptionStatusType.Empty
+                            });
+                        }
+                    }
+                }
+
+                memberData.TotalPaid = totalPaid;
+                memberStatusData.Add(memberData);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα κατά τη φόρτωση δεδομένων: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private SubscriptionStatusType DetermineSubscriptionStatus(
+        Subscription subscription,
+        List<Subscription> allMemberSubscriptions,
+        List<Payment> memberPayments,
+        MonthColumn currentMonth)
+    {
+        // Check if subscription is paid
+        if (subscription.Status == SubscriptionStatus.Paid)
+        {
+            // Check if this month was paid as part of a multi-month payment (overpaid/gray)
+            var paymentForThisSubscription = memberPayments
+                .Where(p => p.SubscriptionId == subscription.Id)
+                .OrderBy(p => p.PaymentDate)
+                .FirstOrDefault();
+
+            if (paymentForThisSubscription != null)
+            {
+                // Check if payment amount covers multiple months
+                var monthsCouldCover = (int)(paymentForThisSubscription.Amount / subscription.Amount);
+
+                if (monthsCouldCover > 1)
+                {
+                    // This is part of a multi-month payment
+                    return SubscriptionStatusType.Overpaid;
+                }
+            }
+
+            return SubscriptionStatusType.Paid;
+        }
+
+        // Check if subscription is unpaid (blue)
+        if (subscription.Status == SubscriptionStatus.Pending || subscription.Status == SubscriptionStatus.Overdue)
+        {
+            return SubscriptionStatusType.Unpaid;
+        }
+
+        // Check if this is where subscription stopped (red)
+        var nextMonth = currentMonth.Month == 12 ? 1 : currentMonth.Month + 1;
+        var nextYear = currentMonth.Month == 12 ? currentMonth.Year + 1 : currentMonth.Year;
+
+        var hasNextSubscription = allMemberSubscriptions.Any(s =>
+            s.Year == nextYear && s.Month == nextMonth);
+
+        if (!hasNextSubscription && subscription.Status != SubscriptionStatus.Paid)
+        {
+            return SubscriptionStatusType.Stopped;
+        }
+
+        return SubscriptionStatusType.Paid;
+    }
+
+    private void GenerateMonthColumns()
+    {
+        monthColumns.Clear();
+
+        if (startDate == null || endDate == null)
+            return;
+
+        var current = new DateTime(startDate.Value.Year, startDate.Value.Month, 1);
+        var end = new DateTime(endDate.Value.Year, endDate.Value.Month, 1);
+
+        var greekMonths = new[] { "", "ΙΑΝ", "ΦΕΒ", "ΜΑΡ", "ΑΠΡ", "ΜΑΙ", "ΙΟΥΝ", "ΙΟΥΛ", "ΑΥΓ", "ΣΕΠ", "ΟΚΤ", "ΝΟΕ", "ΔΕΚ" };
+        var greekMonthsFull = new[] { "", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος",
+                                      "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος" };
+
+        while (current <= end)
+        {
+            monthColumns.Add(new MonthColumn
+            {
+                Year = current.Year,
+                Month = current.Month,
+                ShortName = greekMonths[current.Month],
+                FullName = $"{greekMonthsFull[current.Month]} {current.Year}"
+            });
+
+            current = current.AddMonths(1);
+        }
+    }
+
+    private string GetStatusClass(MonthlyStatusInfo? status)
+    {
+        if (status == null)
+            return "status-empty";
+
+        return status.Status switch
+        {
+            SubscriptionStatusType.Paid => "status-paid",
+            SubscriptionStatusType.Unpaid => "status-unpaid",
+            SubscriptionStatusType.Overpaid => "status-overpaid",
+            SubscriptionStatusType.Stopped => "status-stopped",
+            SubscriptionStatusType.Future => "status-future",
+            _ => "status-empty"
+        };
+    }
+}

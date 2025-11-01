@@ -9,10 +9,14 @@ public class MembersHubContextFactory : IDesignTimeDbContextFactory<MembersHubCo
     {
         var optionsBuilder = new DbContextOptionsBuilder<MembersHubContext>();
 
-        // Simple default connection string για development
-        var connectionString = "Server=100.113.99.32,1433;Database=membershubdb;User Id=sa;Password=admin8*;TrustServerCertificate=true;Encrypt=false;";
+        // Default PostgreSQL connection string for design-time operations (migrations)
+        // This will be overridden by Aspire at runtime
+        var connectionString = "Host=localhost;Port=5432;Database=membershubdb;Username=postgres;Password=postgres";
 
-        optionsBuilder.UseSqlServer(connectionString);
+        optionsBuilder.UseNpgsql(connectionString, npgsqlOptions =>
+        {
+            npgsqlOptions.MigrationsAssembly(typeof(MembersHubContext).Assembly.FullName);
+        });
 
         return new MembersHubContext(optionsBuilder.Options);
     }

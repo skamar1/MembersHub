@@ -11,21 +11,21 @@ using System;
 using System.Reflection;
 
 [assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("8590b563-2ef6-4b53-b877-9f682d077ef4")]
-[assembly: System.Reflection.AssemblyMetadata("dcpclipath", ("/Users/arisskamagakis/.nuget/packages/aspire.hosting.orchestration.osx-arm64/9.3." +
-    "0/tools/dcp"))]
-[assembly: System.Reflection.AssemblyMetadata("dcpextensionpaths", ("/Users/arisskamagakis/.nuget/packages/aspire.hosting.orchestration.osx-arm64/9.3." +
-    "0/tools/ext/"))]
-[assembly: System.Reflection.AssemblyMetadata("dcpbinpath", ("/Users/arisskamagakis/.nuget/packages/aspire.hosting.orchestration.osx-arm64/9.3." +
-    "0/tools/ext/bin/"))]
+[assembly: System.Reflection.AssemblyMetadata("dcpclipath", ("/Users/arisskamagakis/.nuget/packages/aspire.hosting.orchestration.osx-arm64/9.5." +
+    "1/tools/dcp"))]
+[assembly: System.Reflection.AssemblyMetadata("dcpextensionpaths", ("/Users/arisskamagakis/.nuget/packages/aspire.hosting.orchestration.osx-arm64/9.5." +
+    "1/tools/ext/"))]
+[assembly: System.Reflection.AssemblyMetadata("dcpbinpath", ("/Users/arisskamagakis/.nuget/packages/aspire.hosting.orchestration.osx-arm64/9.5." +
+    "1/tools/ext/bin/"))]
 [assembly: System.Reflection.AssemblyMetadata("apphostprojectpath", "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.AppHost")]
 [assembly: System.Reflection.AssemblyMetadata("apphostprojectname", "MembersHub.AppHost.csproj")]
-[assembly: System.Reflection.AssemblyMetadata("aspiredashboardpath", ("/Users/arisskamagakis/.nuget/packages/aspire.dashboard.sdk.osx-arm64/9.3.0/tools/" +
+[assembly: System.Reflection.AssemblyMetadata("aspiredashboardpath", ("/Users/arisskamagakis/.nuget/packages/aspire.dashboard.sdk.osx-arm64/9.5.1/tools/" +
     "Aspire.Dashboard.dll"))]
 [assembly: System.Reflection.AssemblyMetadataAttribute("apphostprojectbaseintermediateoutputpath", "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.AppHost/obj/")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("MembersHub.AppHost")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e8e730297dd8c0acf41042829a2b0ec1ab8e40ce")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9f80a8c8423a790213869da740f339278b9d53fb")]
 [assembly: System.Reflection.AssemblyProductAttribute("MembersHub.AppHost")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MembersHub.AppHost")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

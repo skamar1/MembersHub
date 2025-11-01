@@ -1,0 +1,162 @@
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MudBlazor
+@inject IExpenseCategoryService ExpenseCategoryService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid Spacing="3">
+            <MudItem xs="12">
+                @if (ExistingCategory != null)
+                {
+                    <MudAlert Severity="Severity.Info">
+                        Επεξεργασία Κατηγορίας: @ExistingCategory.Name
+                    </MudAlert>
+                }
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField Label="Όνομα Κατηγορίας *"
+                              @bind-Value="category.Name"
+                              Required="true"
+                              Variant="Variant.Outlined"
+                              MaxLength="100"
+                              Counter="100" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField Label="Περιγραφή"
+                              @bind-Value="category.Description"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              MaxLength="500"
+                              Counter="500" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudTextField Label="Όνομα Icon (MudBlazor)"
+                              @bind-Value="category.IconName"
+                              Variant="Variant.Outlined"
+                              MaxLength="50"
+                              Placeholder="π.χ. Icons.Material.Filled.Receipt" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudColorPicker Label="Χρώμα"
+                                @bind-Text="category.ColorCode"
+                                Variant="Variant.Outlined"
+                                ColorPickerView="ColorPickerView.Palette"
+                                Placeholder="#RRGGBB" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudNumericField T="int"
+                                 Label="Σειρά Εμφάνισης"
+                                 @bind-Value="category.DisplayOrder"
+                                 Variant="Variant.Outlined"
+                                 Min="0"
+                                 HelperText="Χαμηλότερος αριθμός = εμφάνιση πρώτα" />
+            </MudItem>
+
+            @if (ExistingCategory != null)
+            {
+                <MudItem xs="12">
+                    <MudSwitch T="bool"
+                               @bind-Value="category.IsActive"
+                               Color="Color.Primary"
+                               Label="Ενεργή Κατηγορία" />
+                </MudItem>
+            }
+
+            @if (saving)
+            {
+                <MudItem xs="12">
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Άκυρο</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Save"
+                   Disabled="@saving">
+            @(ExistingCategory != null ? "Ενημέρωση" : "Δημιουργία")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    public IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public ExpenseCategory? ExistingCategory { get; set; }
+
+    private ExpenseCategory category = new();
+    private bool saving = false;
+
+    protected override void OnInitialized()
+    {
+        if (ExistingCategory != null)
+        {
+            category = new ExpenseCategory
+            {
+                Id = ExistingCategory.Id,
+                Name = ExistingCategory.Name,
+                Description = ExistingCategory.Description,
+                IconName = ExistingCategory.IconName,
+                ColorCode = ExistingCategory.ColorCode,
+                DisplayOrder = ExistingCategory.DisplayOrder,
+                IsActive = ExistingCategory.IsActive
+            };
+        }
+        else
+        {
+            category.IsActive = true;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(category.Name))
+        {
+            Snackbar.Add("Παρακαλώ συμπληρώστε το όνομα της κατηγορίας", Severity.Error);
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            if (ExistingCategory != null)
+            {
+                // Update existing category
+                var updated = await ExpenseCategoryService.UpdateCategoryAsync(category);
+                Snackbar.Add($"Η κατηγορία '{updated.Name}' ενημερώθηκε επιτυχώς", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(updated));
+            }
+            else
+            {
+                // Create new category
+                var created = await ExpenseCategoryService.CreateCategoryAsync(category);
+                Snackbar.Add($"Η κατηγορία '{created.Name}' δημιουργήθηκε επιτυχώς", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(created));
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

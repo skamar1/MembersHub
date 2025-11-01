@@ -1,0 +1,185 @@
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MudBlazor
+@inject IExpenseService ExpenseService
+@inject IExpenseCategoryService ExpenseCategoryService
+@inject ISnackbar Snackbar
+@inject ISessionService SessionService
+
+<MudDialog>
+    <DialogContent>
+        <MudGrid Spacing="3">
+            <MudItem xs="12">
+                @if (ExistingExpense != null)
+                {
+                    <MudAlert Severity="Severity.Info">
+                        Επεξεργασία Εξόδου: @ExistingExpense.ExpenseNumber
+                    </MudAlert>
+                }
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Label="Ημερομηνία *"
+                               @bind-Date="expenseDate"
+                               Required="true"
+                               Variant="Variant.Outlined"
+                               MaxDate="DateTime.Today"
+                               DateFormat="dd/MM/yyyy" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudNumericField T="decimal"
+                                 Label="Ποσό (€) *"
+                                 @bind-Value="expense.Amount"
+                                 Required="true"
+                                 Variant="Variant.Outlined"
+                                 Min="0.01m"
+                                 Step="0.01m"
+                                 Format="N2" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudSelect T="int"
+                           @bind-Value="expense.ExpenseCategoryId"
+                           Label="Κατηγορία *"
+                           Variant="Variant.Outlined"
+                           Required="true">
+                    @foreach (var category in categories)
+                    {
+                        <MudSelectItem T="int" Value="@category.Id">
+                            @category.Name
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField Label="Περιγραφή *"
+                              @bind-Value="expense.Description"
+                              Required="true"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              MaxLength="500" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField Label="Προμηθευτής"
+                              @bind-Value="expense.Vendor"
+                              Variant="Variant.Outlined"
+                              MaxLength="200" />
+            </MudItem>
+
+            @if (saving)
+            {
+                <MudItem xs="12">
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Άκυρο</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Save"
+                   Disabled="@saving">
+            @(ExistingExpense != null ? "Ενημέρωση" : "Δημιουργία")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    public IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Expense? ExistingExpense { get; set; }
+
+    private Expense expense = new();
+    private DateTime? expenseDate = DateTime.Today;
+    private bool saving = false;
+    private List<ExpenseCategory> categories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await ExpenseCategoryService.GetActiveCategoriesAsync();
+
+        if (ExistingExpense != null)
+        {
+            expense = new Expense
+            {
+                Id = ExistingExpense.Id,
+                Amount = ExistingExpense.Amount,
+                ExpenseCategoryId = ExistingExpense.ExpenseCategoryId,
+                Description = ExistingExpense.Description,
+                Vendor = ExistingExpense.Vendor,
+                Date = ExistingExpense.Date,
+                SubmittedBy = ExistingExpense.SubmittedBy
+            };
+            expenseDate = ExistingExpense.Date;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (!expenseDate.HasValue)
+        {
+            Snackbar.Add("Παρακαλώ επιλέξτε ημερομηνία", Severity.Error);
+            return;
+        }
+
+        if (expense.Amount <= 0)
+        {
+            Snackbar.Add("Το ποσό πρέπει να είναι μεγαλύτερο από 0", Severity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(expense.Description))
+        {
+            Snackbar.Add("Παρακαλώ συμπληρώστε την περιγραφή", Severity.Error);
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            expense.Date = expenseDate.Value;
+
+            if (ExistingExpense != null)
+            {
+                // Update existing expense
+                var updated = await ExpenseService.UpdateExpenseAsync(expense);
+                Snackbar.Add($"Το έξοδο {updated.ExpenseNumber} ενημερώθηκε επιτυχώς", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(updated));
+            }
+            else
+            {
+                // Create new expense
+                var currentUser = await SessionService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    Snackbar.Add("Σφάλμα: Δεν βρέθηκε συνδεδεμένος χρήστης", Severity.Error);
+                    return;
+                }
+
+                expense.SubmittedBy = currentUser.Id;
+                var created = await ExpenseService.SubmitExpenseAsync(expense);
+                Snackbar.Add($"Το έξοδο {created.ExpenseNumber} δημιουργήθηκε επιτυχώς", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(created));
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

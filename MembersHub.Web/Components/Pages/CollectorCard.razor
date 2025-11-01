@@ -1,0 +1,571 @@
+@page "/collector-card"
+@page "/collector-card/{UserId:int}"
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IDbContextFactory<MembersHubContext> ContextFactory
+@inject ICashierHandoverService HandoverService
+@inject ISessionService SessionService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
+
+<PageTitle>Η Καρτέλα μου - MembersHub</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    @if (loading)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </div>
+    }
+    else if (collector != null)
+    {
+        <!-- Header -->
+        <div class="d-flex justify-space-between align-center mb-6">
+            <div>
+                <MudText Typo="Typo.h4">💼 Οικονομική Καρτέλα</MudText>
+                <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                    @collector.FullName (@collector.Username)
+                </MudText>
+            </div>
+            <div class="d-flex gap-4 align-center">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Success"
+                           StartIcon="@Icons.Material.Filled.AccountBalanceWallet"
+                           Href="/cashier-handover">
+                    Παράδοση Ταμείου
+                </MudButton>
+                <AuthorizeView Roles="Admin,Owner">
+                    <Authorized>
+                        @if (canSelectCollector)
+                        {
+                            <MudAutocomplete T="User"
+                                             Value="collector"
+                                             ValueChanged="OnCollectorChanged"
+                                             SearchFunc="SearchCollectors"
+                                             ToStringFunc="@(u => u?.FullName ?? "")"
+                                             Label="Επιλογή Εισπράκτορα"
+                                             Variant="Variant.Outlined"
+                                             AdornmentIcon="@Icons.Material.Filled.Person"
+                                             Style="min-width: 300px;" />
+                        }
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </div>
+
+        <!-- Period Selection -->
+        <MudPaper Class="pa-4 mb-6" Elevation="2">
+            <MudGrid>
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Από" Date="startDate" DateChanged="OnStartDateChanged" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Έως" Date="endDate" DateChanged="OnEndDateChanged" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="string" Label="Γρήγορη επιλογή" Value="@selectedPeriod" ValueChanged="OnPeriodChanged">
+                        <MudSelectItem Value="@("today")">Σήμερα</MudSelectItem>
+                        <MudSelectItem Value="@("this_week")">Αυτή την εβδομάδα</MudSelectItem>
+                        <MudSelectItem Value="@("this_month")">Αυτός ο μήνας</MudSelectItem>
+                        <MudSelectItem Value="@("last_month")">Προηγούμενος μήνας</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <!-- Summary Cards -->
+        <MudGrid Class="mb-6">
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="3" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <MudCardContent Class="text-center" Style="color: white;">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Large" Class="mb-2" />
+                        <MudText Typo="Typo.h6">Συνολικές Εισπράξεις</MudText>
+                        <MudText Typo="Typo.h3">€@totalCollections.ToString("N2")</MudText>
+                        <MudText Typo="Typo.caption">@paymentsCount πληρωμές</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="3" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <MudCardContent Class="text-center" Style="color: white;">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Size="Size.Large" Class="mb-2" />
+                        <MudText Typo="Typo.h6">Συνολικά Έξοδα</MudText>
+                        <MudText Typo="Typo.h3">€@totalExpenses.ToString("N2")</MudText>
+                        <MudText Typo="Typo.caption">@expensesCount έξοδα</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="3" Style="@GetBalanceCardStyle()">
+                    <MudCardContent Class="text-center" Style="color: white;">
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Size="Size.Large" Class="mb-2" />
+                        <MudText Typo="Typo.h6">Υπόλοιπο</MudText>
+                        <MudText Typo="Typo.h3">€@balance.ToString("N2")</MudText>
+                        <MudText Typo="Typo.caption">@GetBalanceDescription()</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="3" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <MudCardContent Class="text-center" Style="color: white;">
+                        <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Large" Class="mb-2" />
+                        <MudText Typo="Typo.h6">Παράδοση Ταμείου</MudText>
+                        <MudText Typo="Typo.h5">@(lastDeliveryDate?.ToString("dd/MM/yyyy") ?? "Ποτέ")</MudText>
+                        <MudText Typo="Typo.caption">@GetDaysSinceDelivery()</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Payments and Expenses Tables -->
+        <MudGrid>
+            <MudItem xs="12" lg="6">
+                <MudCard Elevation="3">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">💰 Εισπράξεις</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           Href="/payments/new" />
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent Class="pa-0">
+                        @if (payments.Any())
+                        {
+                            <MudTable Items="@payments" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                                <HeaderContent>
+                                    <MudTh>Ημερομηνία</MudTh>
+                                    <MudTh>Μέλος</MudTh>
+                                    <MudTh Style="text-align: right;">Ποσό</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Ημερομηνία">@context.PaymentDate.ToString("dd/MM/yyyy")</MudTd>
+                                    <MudTd DataLabel="Μέλος">
+                                        <MudText Typo="Typo.body2">@context.Member.FullName</MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Ποσό" Style="text-align: right;">
+                                        <MudText Typo="Typo.body2" Color="Color.Success">
+                                            <strong>€@context.Amount.ToString("N2")</strong>
+                                        </MudText>
+                                    </MudTd>
+                                </RowTemplate>
+                                <PagerContent>
+                                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                                </PagerContent>
+                            </MudTable>
+                        }
+                        else
+                        {
+                            <div class="text-center pa-8">
+                                <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Color="Color.Default" />
+                                <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">
+                                    Δεν υπάρχουν εισπράξεις για αυτή την περίοδο
+                                </MudText>
+                            </div>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" lg="6">
+                <MudCard Elevation="3">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">🧾 Έξοδα</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           Href="/expenses" />
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent Class="pa-0">
+                        @if (expenses.Any())
+                        {
+                            <MudTable Items="@expenses" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                                <HeaderContent>
+                                    <MudTh>Ημερομηνία</MudTh>
+                                    <MudTh>Κατηγορία</MudTh>
+                                    <MudTh Style="text-align: right;">Ποσό</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Ημερομηνία">@context.Date.ToString("dd/MM/yyyy")</MudTd>
+                                    <MudTd DataLabel="Κατηγορία">
+                                        <MudText Typo="Typo.body2">@(context.Category?.Name ?? "N/A")</MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Ποσό" Style="text-align: right;">
+                                        <MudText Typo="Typo.body2" Color="Color.Error">
+                                            <strong>€@context.Amount.ToString("N2")</strong>
+                                        </MudText>
+                                    </MudTd>
+                                </RowTemplate>
+                                <PagerContent>
+                                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                                </PagerContent>
+                            </MudTable>
+                        }
+                        else
+                        {
+                            <div class="text-center pa-8">
+                                <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Color="Color.Default" />
+                                <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">
+                                    Δεν υπάρχουν έξοδα για αυτή την περίοδο
+                                </MudText>
+                            </div>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Breakdown by Payment Method -->
+        <MudCard Elevation="3" Class="mt-6">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">💳 Ανάλυση Τρόπων Πληρωμής</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (paymentsByMethod.Any())
+                {
+                    <MudGrid>
+                        @foreach (var method in paymentsByMethod)
+                        {
+                            <MudItem xs="12" sm="6" md="3">
+                                <MudPaper Class="pa-4 text-center" Elevation="1">
+                                    <MudText Typo="Typo.body1" Color="Color.Primary">
+                                        <strong>@GetPaymentMethodName(method.Key)</strong>
+                                    </MudText>
+                                    <MudText Typo="Typo.h5" Class="mt-2">€@method.Value.ToString("N2")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @paymentMethodCounts[method.Key] πληρωμές
+                                    </MudText>
+                                </MudPaper>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+                else
+                {
+                    <div class="text-center pa-4">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Δεν υπάρχουν εισπράξεις</MudText>
+                    </div>
+                }
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Breakdown by Expense Category -->
+        <MudCard Elevation="3" Class="mt-6">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">📂 Ανάλυση Κατηγοριών Εξόδων</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (expensesByCategory.Any())
+                {
+                    <MudGrid>
+                        @foreach (var category in expensesByCategory)
+                        {
+                            <MudItem xs="12" sm="6" md="3">
+                                <MudPaper Class="pa-4 text-center" Elevation="1">
+                                    <MudText Typo="Typo.body1" Color="Color.Error">
+                                        <strong>@category.Key</strong>
+                                    </MudText>
+                                    <MudText Typo="Typo.h5" Class="mt-2">€@category.Value.ToString("N2")</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @expenseCategoryCounts[category.Key] έξοδα
+                                    </MudText>
+                                </MudPaper>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+                else
+                {
+                    <div class="text-center pa-4">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Δεν υπάρχουν έξοδα</MudText>
+                    </div>
+                }
+            </MudCardContent>
+        </MudCard>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public int? UserId { get; set; }
+
+    private bool loading = true;
+    private User? collector;
+    private User? currentUser;
+    private List<User> allCollectors = new();
+    private bool canSelectCollector = false;
+
+    // Date range
+    private DateTime? startDate = DateTime.Today;
+    private DateTime? endDate = DateTime.Today;
+    private string selectedPeriod = "today";
+
+    // Financial data
+    private List<Payment> payments = new();
+    private List<Expense> expenses = new();
+    private decimal totalCollections = 0;
+    private decimal totalExpenses = 0;
+    private decimal balance = 0;
+    private int paymentsCount = 0;
+    private int expensesCount = 0;
+    private DateTime? lastDeliveryDate;
+
+    // Analytics
+    private Dictionary<PaymentMethod, decimal> paymentsByMethod = new();
+    private Dictionary<PaymentMethod, int> paymentMethodCounts = new();
+    private Dictionary<string, decimal> expensesByCategory = new();
+    private Dictionary<string, int> expenseCategoryCounts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = await SessionService.GetCurrentUserAsync();
+
+        if (currentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        // Check if user can select other collectors (Admin/Owner)
+        canSelectCollector = currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner;
+
+        if (canSelectCollector)
+        {
+            await LoadCollectors();
+        }
+
+        // Determine which collector to show
+        if (UserId.HasValue && canSelectCollector)
+        {
+            // Admin/Owner viewing specific collector
+            collector = allCollectors.FirstOrDefault(c => c.Id == UserId.Value);
+        }
+        else
+        {
+            // Show current user's data
+            collector = currentUser;
+        }
+
+        if (collector != null)
+        {
+            await LoadData();
+        }
+
+        loading = false;
+    }
+
+    private async Task LoadCollectors()
+    {
+        try
+        {
+            using var context = ContextFactory.CreateDbContext();
+            allCollectors = await context.Users
+                .Where(u => u.Role == UserRole.Treasurer && u.IsActive)
+                .OrderBy(u => u.LastName)
+                .ThenBy(u => u.FirstName)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης εισπρακτόρων: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task<IEnumerable<User>> SearchCollectors(string value, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return allCollectors.Take(10);
+
+        return allCollectors
+            .Where(u => u.FullName.Contains(value, StringComparison.OrdinalIgnoreCase) ||
+                       u.Username.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(10);
+    }
+
+    private async Task OnCollectorChanged(User? selectedCollector)
+    {
+        if (selectedCollector == null) return;
+
+        collector = selectedCollector;
+        Navigation.NavigateTo($"/collector-card/{collector.Id}");
+        await LoadData();
+    }
+
+    private async Task OnPeriodChanged(string period)
+    {
+        selectedPeriod = period;
+        var now = DateTime.Today;
+
+        switch (period)
+        {
+            case "today":
+                startDate = now;
+                endDate = now;
+                break;
+            case "this_week":
+                var dayOfWeek = (int)now.DayOfWeek;
+                var monday = dayOfWeek == 0 ? now.AddDays(-6) : now.AddDays(1 - dayOfWeek);
+                startDate = monday;
+                endDate = monday.AddDays(6);
+                break;
+            case "this_month":
+                startDate = new DateTime(now.Year, now.Month, 1);
+                endDate = startDate.Value.AddMonths(1).AddDays(-1);
+                break;
+            case "last_month":
+                startDate = new DateTime(now.Year, now.Month, 1).AddMonths(-1);
+                endDate = startDate.Value.AddMonths(1).AddDays(-1);
+                break;
+        }
+
+        await LoadData();
+    }
+
+    private async Task OnStartDateChanged(DateTime? newDate)
+    {
+        startDate = newDate;
+        await LoadData();
+    }
+
+    private async Task OnEndDateChanged(DateTime? newDate)
+    {
+        endDate = newDate;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (collector == null || startDate == null || endDate == null) return;
+
+        loading = true;
+        try
+        {
+            using var context = ContextFactory.CreateDbContext();
+
+            // Load payments collected by this user
+            payments = await context.Payments
+                .Include(p => p.Member)
+                .Where(p => p.CollectorId == collector.Id &&
+                           p.PaymentDate >= startDate.Value &&
+                           p.PaymentDate <= endDate.Value.AddDays(1))
+                .OrderByDescending(p => p.PaymentDate)
+                .ToListAsync();
+
+            // Load expenses submitted by this user
+            expenses = await context.Expenses
+                .Include(e => e.Category)
+                .Where(e => e.SubmittedBy == collector.Id &&
+                           e.Date >= startDate.Value &&
+                           e.Date <= endDate.Value.AddDays(1))
+                .OrderByDescending(e => e.Date)
+                .ToListAsync();
+
+            // Calculate totals
+            totalCollections = payments.Sum(p => p.Amount);
+            totalExpenses = expenses.Sum(e => e.Amount);
+            balance = totalCollections - totalExpenses;
+            paymentsCount = payments.Count;
+            expensesCount = expenses.Count;
+
+            // Get last handover date (from the new system)
+            var lastHandover = await context.CashierHandovers
+                .Where(h => h.CashierId == collector.Id && h.Status == HandoverStatus.Confirmed)
+                .OrderByDescending(h => h.PeriodEndDate)
+                .FirstOrDefaultAsync();
+
+            lastDeliveryDate = lastHandover?.PeriodEndDate;
+
+            // Analytics - Payment methods
+            paymentsByMethod = payments
+                .GroupBy(p => p.PaymentMethod)
+                .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+
+            paymentMethodCounts = payments
+                .GroupBy(p => p.PaymentMethod)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            // Analytics - Expense categories
+            expensesByCategory = expenses
+                .GroupBy(e => e.Category?.Name ?? "Χωρίς κατηγορία")
+                .ToDictionary(g => g.Key, g => g.Sum(e => e.Amount));
+
+            expenseCategoryCounts = expenses
+                .GroupBy(e => e.Category?.Name ?? "Χωρίς κατηγορία")
+                .ToDictionary(g => g.Key, g => g.Count());
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης δεδομένων: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private string GetBalanceCardStyle()
+    {
+        if (balance > 0)
+            return "background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);";
+        else if (balance < 0)
+            return "background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);";
+        else
+            return "background: linear-gradient(135deg, #bdc3c7 0%, #2c3e50 100%);";
+    }
+
+    private string GetBalanceDescription()
+    {
+        if (balance > 0)
+            return "Θετικό υπόλοιπο";
+        else if (balance < 0)
+            return "Αρνητικό υπόλοιπο";
+        else
+            return "Μηδενικό υπόλοιπο";
+    }
+
+    private string GetDaysSinceDelivery()
+    {
+        if (lastDeliveryDate == null)
+            return "Δεν έχει γίνει παράδοση";
+
+        var days = (DateTime.Today - lastDeliveryDate.Value.Date).Days;
+        if (days == 0)
+            return "Σήμερα";
+        else if (days == 1)
+            return "Χθες";
+        else
+            return $"Πριν {days} ημέρες";
+    }
+
+    private string GetPaymentMethodName(PaymentMethod method)
+    {
+        return method switch
+        {
+            PaymentMethod.Cash => "Μετρητά",
+            PaymentMethod.Card => "Κάρτα",
+            PaymentMethod.BankTransfer => "Έμβασμα",
+            PaymentMethod.DigitalWallet => "Ψηφιακό Πορτοφόλι",
+            PaymentMethod.Check => "Επιταγή",
+            _ => method.ToString()
+        };
+    }
+}

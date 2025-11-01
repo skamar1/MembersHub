@@ -72,7 +72,7 @@ public class ExpenseService : IExpenseService
                 throw new InvalidOperationException("Μόνο εκκρεμή έξοδα μπορούν να τροποποιηθούν");
 
             existingExpense.Amount = expense.Amount;
-            existingExpense.Category = expense.Category;
+            existingExpense.ExpenseCategoryId = expense.ExpenseCategoryId;
             existingExpense.Description = expense.Description;
             existingExpense.Vendor = expense.Vendor;
             existingExpense.Date = expense.Date;
@@ -99,6 +99,7 @@ public class ExpenseService : IExpenseService
         return await _context.Expenses
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
+            .Include(e => e.Category)
             .FirstOrDefaultAsync(e => e.Id == expenseId);
     }
 
@@ -107,6 +108,7 @@ public class ExpenseService : IExpenseService
         return await _context.Expenses
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
+            .Include(e => e.Category)
             .Where(e => e.SubmittedBy == userId)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
@@ -117,17 +119,19 @@ public class ExpenseService : IExpenseService
         return await _context.Expenses
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
+            .Include(e => e.Category)
             .Where(e => e.Status == status)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
     }
 
-    public async Task<List<Expense>> GetExpensesByCategoryAsync(ExpenseCategory category)
+    public async Task<List<Expense>> GetExpensesByCategoryAsync(int categoryId)
     {
         return await _context.Expenses
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
-            .Where(e => e.Category == category)
+            .Include(e => e.Category)
+            .Where(e => e.ExpenseCategoryId == categoryId)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
     }
@@ -137,6 +141,7 @@ public class ExpenseService : IExpenseService
         return await _context.Expenses
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
+            .Include(e => e.Category)
             .Where(e => e.Date >= startDate && e.Date <= endDate)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
@@ -226,7 +231,7 @@ public class ExpenseService : IExpenseService
                 Amount = -expense.Amount, // Negative for expense
                 Description = $"Έγκριση εξόδου {expense.ExpenseNumber}: {expense.Description}",
                 TransactionDate = expense.Date,
-                Category = GetTransactionCategory(expense.Category),
+                Category = TransactionCategory.Miscellaneous, // Use Miscellaneous for all expenses for now
                 ExpenseId = expense.Id,
                 Status = TransactionStatus.Completed,
                 CreatedBy = approverId,
@@ -363,6 +368,7 @@ public class ExpenseService : IExpenseService
         return await _context.Expenses
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
+            .Include(e => e.Category)
             .Where(e => e.Status == ExpenseStatus.Approved && !e.IsReimbursed)
             .OrderByDescending(e => e.ApprovedAt)
             .ToListAsync();
@@ -375,11 +381,12 @@ public class ExpenseService : IExpenseService
             .SumAsync(e => e.Amount);
     }
 
-    public async Task<Dictionary<ExpenseCategory, decimal>> GetExpensesByCategoryAsync(DateTime startDate, DateTime endDate)
+    public async Task<Dictionary<string, decimal>> GetExpensesByCategoryAsync(DateTime startDate, DateTime endDate)
     {
         return await _context.Expenses
+            .Include(e => e.Category)
             .Where(e => e.Date >= startDate && e.Date <= endDate && e.Status == ExpenseStatus.Approved)
-            .GroupBy(e => e.Category)
+            .GroupBy(e => e.Category.Name)
             .ToDictionaryAsync(g => g.Key, g => g.Sum(e => e.Amount));
     }
 
@@ -573,13 +580,15 @@ public class ExpenseService : IExpenseService
         return monthlyTrends;
     }
 
-    public async Task<List<(ExpenseCategory Category, decimal Amount, int Count)>> GetExpenseCategoryStatsAsync(DateTime startDate, DateTime endDate)
+    public async Task<List<(int CategoryId, string CategoryName, decimal Amount, int Count)>> GetExpenseCategoryStatsAsync(DateTime startDate, DateTime endDate)
     {
         return await _context.Expenses
+            .Include(e => e.Category)
             .Where(e => e.Date >= startDate && e.Date <= endDate && e.Status == ExpenseStatus.Approved)
-            .GroupBy(e => e.Category)
-            .Select(g => new ValueTuple<ExpenseCategory, decimal, int>(
-                g.Key,
+            .GroupBy(e => new { e.Category.Id, e.Category.Name })
+            .Select(g => new ValueTuple<int, string, decimal, int>(
+                g.Key.Id,
+                g.Key.Name,
                 g.Sum(e => e.Amount),
                 g.Count()
             ))
@@ -667,7 +676,7 @@ public class ExpenseService : IExpenseService
                     <h3>Νέο Έξοδο προς Έγκριση</h3>
                     <p><strong>Αριθμός:</strong> {expense.ExpenseNumber}</p>
                     <p><strong>Ποσό:</strong> {expense.Amount:C}</p>
-                    <p><strong>Κατηγορία:</strong> {GetCategoryDisplayName(expense.Category)}</p>
+                    <p><strong>Κατηγορία:</strong> {expense.Category?.Name ?? "Δεν καθορίστηκε"}</p>
                     <p><strong>Περιγραφή:</strong> {expense.Description}</p>
                     <p><strong>Ημερομηνία:</strong> {expense.Date:dd/MM/yyyy}</p>
                     <p><strong>Προμηθευτής:</strong> {expense.Vendor ?? "Δεν καθορίστηκε"}</p>
@@ -708,50 +717,6 @@ public class ExpenseService : IExpenseService
         {
             _logger.LogWarning(ex, "Αποτυχία αποστολής ειδοποίησης έγκρισης για έξοδο {ExpenseNumber}", expense.ExpenseNumber);
         }
-    }
-
-    private static TransactionCategory GetTransactionCategory(ExpenseCategory expenseCategory)
-    {
-        return expenseCategory switch
-        {
-            ExpenseCategory.OfficeSupplies => TransactionCategory.OfficeSupplies,
-            ExpenseCategory.Equipment => TransactionCategory.Equipment,
-            ExpenseCategory.Maintenance => TransactionCategory.Maintenance,
-            ExpenseCategory.Utilities => TransactionCategory.Utilities,
-            ExpenseCategory.Travel => TransactionCategory.Travel,
-            ExpenseCategory.Meals => TransactionCategory.Meals,
-            ExpenseCategory.Insurance => TransactionCategory.Insurance,
-            ExpenseCategory.Legal => TransactionCategory.Legal,
-            ExpenseCategory.Marketing => TransactionCategory.Marketing,
-            ExpenseCategory.Communication => TransactionCategory.Miscellaneous,
-            ExpenseCategory.Training => TransactionCategory.Miscellaneous,
-            ExpenseCategory.Software => TransactionCategory.Miscellaneous,
-            ExpenseCategory.Rent => TransactionCategory.Miscellaneous,
-            ExpenseCategory.Miscellaneous => TransactionCategory.Miscellaneous,
-            _ => TransactionCategory.Miscellaneous
-        };
-    }
-
-    private static string GetCategoryDisplayName(ExpenseCategory category)
-    {
-        return category switch
-        {
-            ExpenseCategory.OfficeSupplies => "Γραφική Ύλη",
-            ExpenseCategory.Equipment => "Εξοπλισμός",
-            ExpenseCategory.Maintenance => "Συντήρηση",
-            ExpenseCategory.Utilities => "Λογαριασμοί",
-            ExpenseCategory.Travel => "Ταξίδια",
-            ExpenseCategory.Meals => "Γεύματα",
-            ExpenseCategory.Insurance => "Ασφάλιση",
-            ExpenseCategory.Legal => "Νομικά",
-            ExpenseCategory.Marketing => "Μάρκετινγκ",
-            ExpenseCategory.Rent => "Ενοίκιο",
-            ExpenseCategory.Software => "Λογισμικό",
-            ExpenseCategory.Training => "Εκπαίδευση",
-            ExpenseCategory.Communication => "Επικοινωνία",
-            ExpenseCategory.Miscellaneous => "Διάφορα",
-            _ => category.ToString()
-        };
     }
 
     #endregion

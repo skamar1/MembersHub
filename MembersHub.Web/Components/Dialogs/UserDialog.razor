@@ -4,7 +4,7 @@
 @using MembersHub.Infrastructure.Data
 @using System.ComponentModel.DataAnnotations
 @using MudBlazor
-@inject MembersHubContext DbContext
+@inject IDbContextFactory<MembersHubContext> ContextFactory
 @inject ISnackbar Snackbar
 @inject IAuthenticationService AuthService
 @inject IAuditService AuditService
@@ -263,28 +263,27 @@
         {
             if (IsEdit && existingUser != null)
             {
+                using var context = ContextFactory.CreateDbContext();
+
                 // Get old values for audit (AsNoTracking για accurate snapshot)
-                var oldUser = await DbContext.Users
+                var oldUser = await context.Users
                     .AsNoTracking()
                     .FirstOrDefaultAsync(u => u.Id == existingUser.Id);
-                    
+
                 if (oldUser == null)
                 {
                     Snackbar.Add("Σφάλμα: Ο χρήστης δεν βρέθηκε", Severity.Error);
                     return;
                 }
-                
-                // Detach any existing tracked entities to avoid conflicts
-                DbContext.Entry(existingUser).State = EntityState.Detached;
-                
+
                 // Get fresh entity from database for update
-                var userToUpdate = await DbContext.Users.FindAsync(existingUser.Id);
+                var userToUpdate = await context.Users.FindAsync(existingUser.Id);
                 if (userToUpdate == null)
                 {
                     Snackbar.Add("Σφάλμα: Ο χρήστης δεν βρέθηκε", Severity.Error);
                     return;
                 }
-                
+
                 // Update user properties
                 userToUpdate.FirstName = model.FirstName;
                 userToUpdate.LastName = model.LastName;
@@ -293,34 +292,34 @@
                 userToUpdate.Role = model.Role;
                 userToUpdate.IsActive = model.IsActive;
                 userToUpdate.UpdatedAt = DateTime.UtcNow;
-                
-                // No need to call Update() since userToUpdate is already tracked
-                // DbContext.Users.Update(userToUpdate);
-                await DbContext.SaveChangesAsync();
-                
+
+                await context.SaveChangesAsync();
+
                 // Audit logging για user update
                 var currentUser = await SessionService.GetCurrentUserAsync();
                 if (currentUser != null)
                 {
-                    await AuditService.LogUpdateAsync(oldUser, userToUpdate, 
-                        currentUser.Id, currentUser.Username, currentUser.FullName, 
+                    await AuditService.LogUpdateAsync(oldUser, userToUpdate,
+                        currentUser.Id, currentUser.Username, currentUser.FullName,
                         HttpContextInfo.GetIpAddress());
                 }
-                
+
                 Snackbar.Add($"Ο χρήστης '{userToUpdate.FullName}' ενημερώθηκε επιτυχώς", Severity.Success);
             }
             else
             {
+                using var context = ContextFactory.CreateDbContext();
+
                 // Check if username already exists
-                var existingUsername = await DbContext.Users
+                var existingUsername = await context.Users
                     .AnyAsync(u => u.Username == model.Username);
-                    
+
                 if (existingUsername)
                 {
                     Snackbar.Add("Το όνομα χρήστη υπάρχει ήδη", Severity.Error);
                     return;
                 }
-                
+
                 // Create new user
                 var newUser = new User
                 {
@@ -335,19 +334,19 @@
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
-                
-                DbContext.Users.Add(newUser);
-                await DbContext.SaveChangesAsync();
-                
+
+                context.Users.Add(newUser);
+                await context.SaveChangesAsync();
+
                 // Audit logging για user creation
                 var currentUser = await SessionService.GetCurrentUserAsync();
                 if (currentUser != null)
                 {
-                    await AuditService.LogCreateAsync(newUser, 
-                        currentUser.Id, currentUser.Username, currentUser.FullName, 
+                    await AuditService.LogCreateAsync(newUser,
+                        currentUser.Id, currentUser.Username, currentUser.FullName,
                         HttpContextInfo.GetIpAddress());
                 }
-                
+
                 Snackbar.Add($"Ο χρήστης '{newUser.FullName}' δημιουργήθηκε επιτυχώς", Severity.Success);
             }
             

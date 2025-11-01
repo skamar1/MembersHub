@@ -13,25 +13,35 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // Get connection string
-        var connectionString = configuration.GetConnectionString("membershubdb")
-            ?? "Server=100.113.99.32\\EXP2022;Database=membershubdb;User Id=sa;Password=admin8*;TrustServerCertificate=true;Encrypt=false;";
+        // Check if DbContextFactory is already registered
+        var factoryDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IDbContextFactory<MembersHubContext>));
 
-        // Add DbContext Factory for Blazor thread safety - this handles both factory and scoped contexts
-        services.AddDbContextFactory<MembersHubContext>(options =>
+        if (factoryDescriptor == null)
         {
-            options.UseSqlServer(connectionString, sqlServerOptions =>
+            // Factory not registered - register it
+            var connectionString = configuration.GetConnectionString("membershubdb");
+
+            services.AddDbContextFactory<MembersHubContext>(options =>
             {
-                sqlServerOptions.MigrationsAssembly(typeof(MembersHubContext).Assembly.FullName);
+                options.UseNpgsql(connectionString, npgsqlOptions =>
+                {
+                    npgsqlOptions.MigrationsAssembly(typeof(MembersHubContext).Assembly.FullName);
+                });
             });
-        });
+        }
 
-        // Add scoped DbContext for services that need it (using the factory)
-        services.AddScoped<MembersHubContext>(provider =>
+        // Check if scoped DbContext is already registered (e.g., by Aspire)
+        var dbContextDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(MembersHubContext));
+
+        if (dbContextDescriptor == null)
         {
-            var factory = provider.GetRequiredService<IDbContextFactory<MembersHubContext>>();
-            return factory.CreateDbContext();
-        });
+            // Add scoped DbContext for services that need it (using the factory)
+            services.AddScoped<MembersHubContext>(provider =>
+            {
+                var factory = provider.GetRequiredService<IDbContextFactory<MembersHubContext>>();
+                return factory.CreateDbContext();
+            });
+        }
 
         // Register generic repository
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));

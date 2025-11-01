@@ -6,7 +6,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using MembersHub.Web.Components.Financial
 @using MembersHub.Web.Models
-@inject MembersHubContext Context
+@inject IDbContextFactory<MembersHubContext> ContextFactory
 @inject IFinancialService FinancialService
 @inject ISubscriptionService SubscriptionService
 @inject IDialogService DialogService
@@ -36,9 +36,9 @@
         <MudGrid AlignItems="Center">
             <MudItem xs="12" sm="6" md="2">
                 <MudSelect T="int" Label="Έτος" @bind-Value="selectedYear">
-                    @for (int year = DateTime.Now.Year - 2; year <= DateTime.Now.Year + 1; year++)
+                    @foreach (var year in availableYears)
                     {
-                        <MudSelectItem Value="@year">@year</MudSelectItem>
+                        <MudSelectItem T="int" Value="@year">@year</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
@@ -70,9 +70,21 @@
                               Adornment="Adornment.End" AdornmentIcon="Icons.Material.Filled.Search" />
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadSubscriptions" Class="mt-4">
-                    <MudIcon Icon="Icons.Material.Filled.Search" Class="mr-2" />
-                    Αναζήτηση
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="LoadSubscriptions"
+                           Class="mt-4"
+                           Disabled="@loading">
+                    @if (loading)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                        <MudText Class="ms-2">Αναζήτηση...</MudText>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="Icons.Material.Filled.Search" Class="mr-2" />
+                        <MudText>Αναζήτηση</MudText>
+                    }
                 </MudButton>
             </MudItem>
         </MudGrid>
@@ -124,14 +136,19 @@
             <MudCard Elevation="3">
                 <MudCardContent>
                     <MudText Typo="Typo.h6" Class="mb-4">💰 Οικονομικά Στοιχεία</MudText>
+                    @{
+                        var totalAmount = subscriptions.Sum(s => s.Amount);
+                        var paidAmountTotal = subscriptions.Sum(s => s.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount));
+                        var outstandingAmount = totalAmount - paidAmountTotal;
+                    }
                     <MudText Typo="Typo.body1">
-                        <strong>Συνολικό Ποσό:</strong> €@subscriptions.Sum(s => s.Amount).ToString("N2")
+                        <strong>Συνολικό Ποσό:</strong> €@totalAmount.ToString("N2")
                     </MudText>
                     <MudText Typo="Typo.body1" Class="mt-2">
-                        <strong>Πληρωμένο Ποσό:</strong> €@subscriptions.Where(s => s.Status == SubscriptionStatus.Paid).Sum(s => s.Amount).ToString("N2")
+                        <strong>Εισπραχθέν Ποσό:</strong> €@paidAmountTotal.ToString("N2")
                     </MudText>
-                    <MudText Typo="Typo.body1" Class="mt-2">
-                        <strong>Εκκρεμές Ποσό:</strong> €@subscriptions.Where(s => s.Status != SubscriptionStatus.Paid).Sum(s => s.Amount).ToString("N2")
+                    <MudText Typo="Typo.body1" Class="mt-2" Color="@(outstandingAmount > 0 ? Color.Error : Color.Success)">
+                        <strong>Υπόλοιπο:</strong> €@outstandingAmount.ToString("N2")
                     </MudText>
                 </MudCardContent>
             </MudCard>
@@ -199,11 +216,28 @@
                             @GetMonthName(context.Item.Month)
                         </CellTemplate>
                     </PropertyColumn>
-                    <PropertyColumn Property="x => x.Amount" Title="Ποσό" Format="C2">
+                    <TemplateColumn Title="Ποσό / Υπόλοιπο">
                         <CellTemplate>
-                            <MudText Typo="Typo.body2" Style="font-weight: 600;">€@context.Item.Amount.ToString("N2")</MudText>
+                            @{
+                                var paidAmount = context.Item.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount);
+                                var remainingAmount = context.Item.Amount - paidAmount;
+                            }
+                            <div>
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">€@context.Item.Amount.ToString("N2")</MudText>
+                                @if (paidAmount > 0)
+                                {
+                                    <MudText Typo="Typo.caption" Color="@(remainingAmount > 0 ? Color.Warning : Color.Success)">
+                                        Πληρώθηκε: €@paidAmount.ToString("N2")
+                                        @if (remainingAmount > 0)
+                                        {
+                                            <br />
+                                            <span>Υπόλοιπο: €@remainingAmount.ToString("N2")</span>
+                                        }
+                                    </MudText>
+                                }
+                            </div>
                         </CellTemplate>
-                    </PropertyColumn>
+                    </TemplateColumn>
                     <PropertyColumn Property="x => x.DueDate" Title="Καταληκτική" Format="dd/MM/yyyy">
                         <CellTemplate>
                             <div class="d-flex align-center">
@@ -215,14 +249,28 @@
                             </div>
                         </CellTemplate>
                     </PropertyColumn>
-                    <PropertyColumn Property="x => x.Status" Title="Κατάσταση">
+                    <TemplateColumn Title="Κατάσταση">
                         <CellTemplate>
-                            <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)"
-                                     Icon="@GetStatusIcon(context.Item.Status)">
-                                @GetStatusText(context.Item.Status)
-                            </MudChip>
+                            @{
+                                var paidAmt = context.Item.Payments.Where(p => p.Status == PaymentStatus.Confirmed).Sum(p => p.Amount);
+                                var isPartiallyPaid = paidAmt > 0 && paidAmt < context.Item.Amount;
+                            }
+                            @if (isPartiallyPaid)
+                            {
+                                <MudChip Size="Size.Small" Color="Color.Info"
+                                         Icon="@Icons.Material.Filled.PendingActions">
+                                    Μερικώς Πληρωμένη
+                                </MudChip>
+                            }
+                            else
+                            {
+                                <MudChip Size="Size.Small" Color="@GetStatusColor(context.Item.Status)"
+                                         Icon="@GetStatusIcon(context.Item.Status)">
+                                    @GetStatusText(context.Item.Status)
+                                </MudChip>
+                            }
                         </CellTemplate>
-                    </PropertyColumn>
+                    </TemplateColumn>
                     <TemplateColumn Title="Πληρωμές">
                         <CellTemplate>
                             @if (context.Item.Payments.Any())
@@ -244,14 +292,14 @@
                             <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
                                 @if (context.Item.Status == SubscriptionStatus.Pending)
                                 {
-                                    <MudIconButton Icon="Icons.Material.Filled.Payment" Color="Color.Success"
+                                    <MudIconButton Icon="@Icons.Material.Filled.Payment" Color="Color.Success"
                                                    OnClick="() => MarkAsPaid(context.Item)"
                                                    Title="Σήμανση ως Πληρωμένη" />
                                 }
-                                <MudIconButton Icon="Icons.Material.Filled.Email" Color="Color.Info"
+                                <MudIconButton Icon="@Icons.Material.Filled.Email" Color="Color.Info"
                                                OnClick="() => SendReminder(context.Item)"
                                                Title="Αποστολή Υπενθύμισης" />
-                                <MudIconButton Icon="Icons.Material.Filled.Edit" Color="Color.Primary"
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary"
                                                OnClick="() => EditSubscription(context.Item)"
                                                Title="Επεξεργασία" />
                             </MudButtonGroup>
@@ -273,6 +321,7 @@
     private SubscriptionStatus? selectedStatus;
     private string memberSearch = "";
 
+    private List<int> availableYears = new();
     private List<Subscription> subscriptions = new();
     private IEnumerable<Subscription> filteredSubscriptions =>
         subscriptions.Where(s => string.IsNullOrWhiteSpace(memberSearch) ||
@@ -282,6 +331,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Αρχικοποίηση λίστας ετών (τρέχον έτος ± 2)
+        var currentYear = DateTime.Now.Year;
+        availableYears = new List<int>();
+        for (int year = currentYear - 2; year <= currentYear + 1; year++)
+        {
+            availableYears.Add(year);
+        }
+
         await LoadSubscriptions();
     }
 
@@ -290,7 +347,11 @@
         loading = true;
         try
         {
-            var query = Context.Subscriptions
+            // Πρώτα ενημερώνουμε τις καταστάσεις των συνδρομών (καθυστερημένες κλπ)
+            await SubscriptionService.AutoUpdateSubscriptionStatusesAsync();
+
+            using var context = ContextFactory.CreateDbContext();
+            var query = context.Subscriptions
                 .Include(s => s.Member)
                 .Include(s => s.Payments)
                 .Where(s => s.Year == selectedYear);
@@ -389,9 +450,11 @@
     {
         try
         {
+            using var context = ContextFactory.CreateDbContext();
+
             subscription.Status = SubscriptionStatus.Paid;
-            Context.Subscriptions.Update(subscription);
-            await Context.SaveChangesAsync();
+            context.Subscriptions.Update(subscription);
+            await context.SaveChangesAsync();
 
             Snackbar.Add("Η συνδρομή σημάνθηκε ως πληρωμένη!", Severity.Success);
             await LoadSubscriptions();

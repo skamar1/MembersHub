@@ -7,85 +7,204 @@
 @using System.ComponentModel.DataAnnotations
 @using MudBlazor
 @inject IMemberService MemberService
-@inject MembersHubContext DbContext
+@inject IDbContextFactory<MembersHubContext> ContextFactory
 @inject ISnackbar Snackbar
 @inject IAuditService AuditService
 @inject ISessionService SessionService
 @inject IHttpContextInfoService HttpContextInfo
 
-<MudDialog>
+<MudDialog Style="min-width: 800px;">
     <DialogContent>
         <MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
-            <MudGrid Spacing="2">
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="model.FirstName" 
-                                  Label="Όνομα" 
-                                  Required="true" 
-                                  RequiredError="Το όνομα είναι υποχρεωτικό"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="model.LastName" 
-                                  Label="Επώνυμο" 
-                                  Required="true" 
-                                  RequiredError="Το επώνυμο είναι υποχρεωτικό"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="model.Phone" 
-                                  Label="Τηλέφωνο" 
-                                  Required="true" 
-                                  RequiredError="Το τηλέφωνο είναι υποχρεωτικό"
-                                  Mask="@(new PatternMask("0000000000"))"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="model.Email" 
-                                  Label="Email" 
-                                  InputType="InputType.Email"
-                                  Validation="@(new EmailAddressAttribute() { ErrorMessage = "Μη έγκυρο email" })"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudDatePicker @bind-Date="dateOfBirth" 
-                                   Label="Ημερομηνία Γέννησης"
-                                   Editable="true"
-                                   DateFormat="dd/MM/yyyy"
-                                   Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudSelect @bind-Value="model.MembershipTypeId" 
-                               Label="Τύπος Συνδρομής" 
-                               Required="true"
-                               RequiredError="Επιλέξτε τύπο συνδρομής"
-                               Variant="Variant.Outlined">
-                        @foreach (var type in membershipTypes)
+            <MudTabs Elevation="2" ApplyEffectsToContainer="true" PanelClass="pa-6">
+                <!-- Basic Information Tab -->
+                <MudTabPanel Text="Βασικά Στοιχεία" Icon="@Icons.Material.Filled.Person">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.FirstName"
+                                          Label="Όνομα"
+                                          Required="true"
+                                          RequiredError="Το όνομα είναι υποχρεωτικό"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.LastName"
+                                          Label="Επώνυμο"
+                                          Required="true"
+                                          RequiredError="Το επώνυμο είναι υποχρεωτικό"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudDatePicker @bind-Date="dateOfBirth"
+                                           Label="Ημερομηνία Γέννησης"
+                                           Editable="true"
+                                           DateFormat="dd/MM/yyyy"
+                                           Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="Gender?" @bind-Value="model.Gender"
+                                       Label="Φύλο"
+                                       Variant="Variant.Outlined">
+                                <MudSelectItem T="Gender?" Value="@((Gender?)null)">Δεν προσδιορίζεται</MudSelectItem>
+                                <MudSelectItem T="Gender?" Value="@((Gender?)Gender.Male)">Άνδρας</MudSelectItem>
+                                <MudSelectItem T="Gender?" Value="@((Gender?)Gender.Female)">Γυναίκα</MudSelectItem>
+                                <MudSelectItem T="Gender?" Value="@((Gender?)Gender.Other)">Άλλο</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.Phone"
+                                          Label="Τηλέφωνο"
+                                          Required="true"
+                                          RequiredError="Το τηλέφωνο είναι υποχρεωτικό"
+                                          Mask="@(new PatternMask("0000000000"))"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.Email"
+                                          Label="Email (προαιρετικό)"
+                                          InputType="InputType.Email"
+                                          Validation="@(new EmailAddressAttribute() { ErrorMessage = "Μη έγκυρο email" })"
+                                          HelperText="Μπορεί να είναι κοινό για παιδιά (π.χ. email γονέα)"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect @bind-Value="model.MembershipTypeId"
+                                       Label="Τύπος Συνδρομής"
+                                       Required="true"
+                                       RequiredError="Επιλέξτε τύπο συνδρομής"
+                                       Variant="Variant.Outlined">
+                                @foreach (var type in membershipTypes)
+                                {
+                                    <MudSelectItem Value="@type.Id">
+                                        @type.Name - €@type.MonthlyFee/μήνα
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        @if (IsEdit)
                         {
-                            <MudSelectItem Value="@type.Id">
-                                @type.Name - €@type.MonthlyFee/μήνα
-                            </MudSelectItem>
+                            <MudItem xs="12" sm="6">
+                                <MudSelect @bind-Value="updateModel.Status"
+                                           Label="Κατάσταση"
+                                           Variant="Variant.Outlined">
+                                    <MudSelectItem Value="MemberStatus.Active">Ενεργό</MudSelectItem>
+                                    <MudSelectItem Value="MemberStatus.Inactive">Ανενεργό</MudSelectItem>
+                                    <MudSelectItem Value="MemberStatus.Suspended">Αναστολή</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField Value="@existingMember?.MemberNumber"
+                                              Label="Αριθμός Μέλους"
+                                              ReadOnly="true"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
                         }
-                    </MudSelect>
-                </MudItem>
-                @if (IsEdit)
-                {
-                    <MudItem xs="12" sm="6">
-                        <MudSelect @bind-Value="updateModel.Status" 
-                                   Label="Κατάσταση"
-                                   Variant="Variant.Outlined">
-                            <MudSelectItem Value="MemberStatus.Active">Ενεργό</MudSelectItem>
-                            <MudSelectItem Value="MemberStatus.Inactive">Ανενεργό</MudSelectItem>
-                            <MudSelectItem Value="MemberStatus.Suspended">Αναστολή</MudSelectItem>
-                        </MudSelect>
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudTextField Value="@existingMember?.MemberNumber" 
-                                      Label="Αριθμός Μέλους" 
-                                      ReadOnly="true"
-                                      Variant="Variant.Outlined" />
-                    </MudItem>
-                }
-            </MudGrid>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <!-- Application & Parents Tab -->
+                <MudTabPanel Text="Αίτηση & Γονείς" Icon="@Icons.Material.Filled.FamilyRestroom">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.ApplicationNumber"
+                                          Label="Αριθμός Αίτησης"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.Department"
+                                          Label="Τμήμα"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudDivider Class="my-3">
+                                <MudText Typo="Typo.subtitle2">Στοιχεία Γονέων</MudText>
+                            </MudDivider>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.FatherFullName"
+                                          Label="Όνομα και Επώνυμο Πατρός"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.MotherFullName"
+                                          Label="Όνομα και Επώνυμο Μητρός"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <!-- Address & Documents Tab -->
+                <MudTabPanel Text="Διεύθυνση & Έγγραφα" Icon="@Icons.Material.Filled.LocationOn">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="model.Address"
+                                          Label="Διεύθυνση"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.PostalCode"
+                                          Label="Ταχυδρομικός Κώδικας"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.City"
+                                          Label="Πόλη"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudDivider Class="my-3">
+                                <MudText Typo="Typo.subtitle2">Επίσημα Έγγραφα</MudText>
+                            </MudDivider>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.IdNumber"
+                                          Label="Αριθμός Ταυτότητας"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.SocialSecurityNumber"
+                                          Label="ΑΜΚΑ"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.TaxNumber"
+                                          Label="ΑΦΜ"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <!-- Guardian Information Tab (for minors) -->
+                <MudTabPanel Text="Στοιχεία Κηδεμόνα" Icon="@Icons.Material.Filled.Shield">
+                    <MudAlert Severity="Severity.Info" Class="mb-4">
+                        Συμπληρώστε τα στοιχεία κηδεμόνα για ανήλικα μέλη (κάτω των 18 ετών).
+                    </MudAlert>
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.GuardianFullName"
+                                          Label="Όνομα και Επώνυμο Κηδεμόνα"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.GuardianPhone"
+                                          Label="Τηλέφωνο Κηδεμόνα"
+                                          Mask="@(new PatternMask("0000000000"))"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.GuardianEmail"
+                                          Label="Email Κηδεμόνα"
+                                          InputType="InputType.Email"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.GuardianTaxNumber"
+                                          Label="ΑΦΜ Κηδεμόνα"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+            </MudTabs>
         </MudForm>
     </DialogContent>
     <DialogActions>
@@ -129,7 +248,8 @@
     protected override async Task OnInitializedAsync()
     {
         // Load membership types
-        membershipTypes = await DbContext.MembershipTypes
+        using var context = ContextFactory.CreateDbContext();
+        membershipTypes = await context.MembershipTypes
             .Where(mt => mt.IsActive)
             .OrderBy(mt => mt.Name)
             .ToListAsync();
@@ -146,6 +266,21 @@
                 Email = existingMember.Email,
                 Phone = existingMember.Phone,
                 DateOfBirth = existingMember.DateOfBirth,
+                Gender = existingMember.Gender,
+                ApplicationNumber = existingMember.ApplicationNumber,
+                Department = existingMember.Department,
+                FatherFullName = existingMember.FatherFullName,
+                MotherFullName = existingMember.MotherFullName,
+                Address = existingMember.Address,
+                PostalCode = existingMember.PostalCode,
+                City = existingMember.City,
+                IdNumber = existingMember.IdNumber,
+                SocialSecurityNumber = existingMember.SocialSecurityNumber,
+                TaxNumber = existingMember.TaxNumber,
+                GuardianFullName = existingMember.GuardianFullName,
+                GuardianPhone = existingMember.GuardianPhone,
+                GuardianTaxNumber = existingMember.GuardianTaxNumber,
+                GuardianEmail = existingMember.GuardianEmail,
                 MembershipTypeId = existingMember.MembershipTypeId,
                 Status = existingMember.Status
             };
@@ -156,6 +291,21 @@
                 Email = existingMember.Email,
                 Phone = existingMember.Phone,
                 DateOfBirth = existingMember.DateOfBirth,
+                Gender = existingMember.Gender,
+                ApplicationNumber = existingMember.ApplicationNumber,
+                Department = existingMember.Department,
+                FatherFullName = existingMember.FatherFullName,
+                MotherFullName = existingMember.MotherFullName,
+                Address = existingMember.Address,
+                PostalCode = existingMember.PostalCode,
+                City = existingMember.City,
+                IdNumber = existingMember.IdNumber,
+                SocialSecurityNumber = existingMember.SocialSecurityNumber,
+                TaxNumber = existingMember.TaxNumber,
+                GuardianFullName = existingMember.GuardianFullName,
+                GuardianPhone = existingMember.GuardianPhone,
+                GuardianTaxNumber = existingMember.GuardianTaxNumber,
+                GuardianEmail = existingMember.GuardianEmail,
                 MembershipTypeId = existingMember.MembershipTypeId
             };
             dateOfBirth = existingMember.DateOfBirth;
@@ -196,19 +346,47 @@
             {
                 // Update existing member
                 // Get old values for audit (AsNoTracking για accurate snapshot)
-                var oldMember = await DbContext.Members
+                using var context = ContextFactory.CreateDbContext();
+                var oldMember = await context.Members
                     .AsNoTracking()
                     .FirstOrDefaultAsync(m => m.Id == updateModel.Id);
                 
                 var member = await MemberService.GetByIdAsync(updateModel.Id);
                 if (member != null && oldMember != null)
                 {
-                    
+                    // Basic Information
                     member.FirstName = model.FirstName;
                     member.LastName = model.LastName;
                     member.Email = model.Email;
                     member.Phone = model.Phone;
                     member.DateOfBirth = model.DateOfBirth;
+                    member.Gender = model.Gender;
+
+                    // Application Information
+                    member.ApplicationNumber = model.ApplicationNumber;
+                    member.Department = model.Department;
+
+                    // Parents Information
+                    member.FatherFullName = model.FatherFullName;
+                    member.MotherFullName = model.MotherFullName;
+
+                    // Address Information
+                    member.Address = model.Address;
+                    member.PostalCode = model.PostalCode;
+                    member.City = model.City;
+
+                    // Official Documents
+                    member.IdNumber = model.IdNumber;
+                    member.SocialSecurityNumber = model.SocialSecurityNumber;
+                    member.TaxNumber = model.TaxNumber;
+
+                    // Guardian Information
+                    member.GuardianFullName = model.GuardianFullName;
+                    member.GuardianPhone = model.GuardianPhone;
+                    member.GuardianTaxNumber = model.GuardianTaxNumber;
+                    member.GuardianEmail = model.GuardianEmail;
+
+                    // Membership Information
                     member.MembershipTypeId = model.MembershipTypeId;
                     member.Status = updateModel.Status;
                     
@@ -244,6 +422,11 @@
                 Snackbar.Add($"Το μέλος '{newMember.FullName}' δημιουργήθηκε επιτυχώς με αριθμό {newMember.MemberNumber}", Severity.Success);
             }
             MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ArgumentException ex)
+        {
+            // Display validation errors clearly
+            Snackbar.Add(ex.Message, Severity.Error);
         }
         catch (Exception ex)
         {

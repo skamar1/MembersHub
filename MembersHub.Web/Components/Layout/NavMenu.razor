@@ -56,10 +56,13 @@
                 Γρήγορη Πρόσβαση
             </MudText>
             <MudNavLink Href="/payments/new" Icon="@Icons.Material.Filled.AddCard">
-                🚀 Νέα Πληρωμή
+                🚀 Νέα Είσπραξη
+            </MudNavLink>
+            <MudNavLink Href="/collector-card" Icon="@Icons.Material.Filled.AccountBalanceWallet">
+                💼 Η Καρτέλα μου
             </MudNavLink>
             <MudNavLink Href="/financial/payments" Icon="@Icons.Material.Filled.Payment">
-                💰 Πληρωμές Σήμερα
+                💰 Εισπράξεις Σήμερα
             </MudNavLink>
             <MudNavLink Href="/members" Icon="@Icons.Material.Filled.Search">
                 🔍 Αναζήτηση Μέλους
@@ -69,10 +72,11 @@
         <MudDivider Class="my-3" />
 
         <MudNavMenu>
+            <!-- Main Navigation -->
             <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
                 Αρχική
             </MudNavLink>
-            
+
             <MudNavLink Href="/members" Icon="@Icons.Material.Filled.People">
                 Μέλη
             </MudNavLink>
@@ -89,31 +93,35 @@
                     <MudNavLink Href="/financial/dashboard" Icon="@Icons.Material.Filled.Dashboard">
                         Dashboard
                     </MudNavLink>
+                    <MudDivider Class="my-2" />
+                    <AuthorizeView Roles="Admin,Owner,Treasurer" Context="collectorCardContext">
+                        <MudNavLink Href="/collector-card" Icon="@Icons.Material.Filled.AccountBalanceWallet">
+                            Η Καρτέλα μου
+                        </MudNavLink>
+                        <MudNavLink Href="/cashier-handover" Icon="@Icons.Material.Filled.SwapHoriz">
+                            Παράδοση Ταμείου
+                        </MudNavLink>
+                        <MudNavLink Href="/handover-history" Icon="@Icons.Material.Filled.History">
+                            Ιστορικό Παραδόσεων
+                        </MudNavLink>
+                    </AuthorizeView>
+                    <MudDivider Class="my-2" />
                     <MudNavLink Href="/financial/payments" Icon="@Icons.Material.Filled.Payment">
-                        Πληρωμές
-                    </MudNavLink>
-                    <MudNavLink Href="/payments/new" Icon="@Icons.Material.Filled.AddCard">
-                        Νέα Πληρωμή
+                        Εισπράξεις
                     </MudNavLink>
                     <MudNavLink Href="/financial/subscriptions" Icon="@Icons.Material.Filled.CalendarMonth">
                         Συνδρομές
                     </MudNavLink>
-                    <AuthorizeView Roles="Admin,Owner" Context="membershipTypeContext">
-                        <MudNavLink Href="/financial/membership-types" Icon="@Icons.Material.Filled.Category">
-                            Τύποι Συνδρομής
-                        </MudNavLink>
-                    </AuthorizeView>
-                    <MudNavLink Href="/financial/invoices" Icon="@Icons.Material.Filled.Receipt">
-                        Τιμολόγια
-                    </MudNavLink>
-                    <MudNavLink Href="/financial/expenses" Icon="@Icons.Material.Filled.ShoppingCart">
+                    <MudNavLink Href="/expenses" Icon="@Icons.Material.Filled.Receipt">
                         Έξοδα
-                    </MudNavLink>
-                    <MudNavLink Href="/financial/reports" Icon="@Icons.Material.Filled.Assessment">
-                        Αναφορές
                     </MudNavLink>
                 </ChildContent>
             </MudNavGroup>
+
+            <!-- Reports Section -->
+            <MudNavLink Href="/financial/reports" Icon="@Icons.Material.Filled.Assessment">
+                Αναφορές
+            </MudNavLink>
 
             <!-- Security Section -->
             <MudNavGroup Expanded="false" MaxHeight="200">
@@ -132,10 +140,32 @@
                     </MudNavLink>
                 </ChildContent>
             </MudNavGroup>
-            
+
             <AuthorizeView Roles="Admin,Owner" Context="adminContext">
                 <Authorized>
-                    <!-- Admin Navigation Group -->
+                    <!-- Settings & Configuration -->
+                    <MudNavGroup Expanded="false" MaxHeight="200">
+                        <TitleContent>
+                            <div style="display: flex; align-items: center;">
+                                <MudIcon Icon="@Icons.Material.Filled.Settings" Style="margin-right: 8px;" />
+                                <MudText>Ρυθμίσεις</MudText>
+                            </div>
+                        </TitleContent>
+                        <ChildContent>
+                            <MudNavLink Href="/financial/membership-types" Icon="@Icons.Material.Filled.CardMembership">
+                                Τύποι Συνδρομής
+                            </MudNavLink>
+                            <MudNavLink Href="/expense-categories" Icon="@Icons.Material.Filled.Category">
+                                Κατηγορίες Εξόδων
+                            </MudNavLink>
+                            <MudDivider Class="my-2" />
+                            <MudNavLink Href="/email-settings" Icon="@Icons.Material.Filled.Email">
+                                Ρυθμίσεις Email
+                            </MudNavLink>
+                        </ChildContent>
+                    </MudNavGroup>
+
+                    <!-- Admin Management -->
                     <MudNavGroup Expanded="false" MaxHeight="250">
                         <TitleContent>
                             <div style="display: flex; align-items: center;">
@@ -148,31 +178,18 @@
                                 Χρήστες
                             </MudNavLink>
                             <MudNavLink Href="/audit-logs" Icon="@Icons.Material.Filled.History">
-                                Ιστορικό
+                                Ιστορικό Ενεργειών
                             </MudNavLink>
-                            <MudNavLink Href="/email-settings" Icon="@Icons.Material.Filled.Email">
-                                Ρυθμίσεις Email
-                            </MudNavLink>
-                            <MudNavLink Href="/test-password-reset" Icon="@Icons.Material.Filled.BugReport">
-                                Δοκιμή Password Reset
-                            </MudNavLink>
-                        </ChildContent>
-                    </MudNavGroup>
-                    
-                    <!-- Admin Security Group -->
-                    <MudNavGroup Expanded="false" MaxHeight="150">
-                        <TitleContent>
-                            <div style="display: flex; align-items: center;">
-                                <MudIcon Icon="@Icons.Material.Filled.Shield" Style="margin-right: 8px;" />
-                                <MudText>Ασφάλεια Admin</MudText>
-                            </div>
-                        </TitleContent>
-                        <ChildContent>
-                            <MudNavLink Href="/security/dashboard" Icon="@Icons.Material.Filled.Dashboard">
+                            <MudDivider Class="my-2" />
+                            <MudNavLink Href="/security/dashboard" Icon="@Icons.Material.Filled.Shield">
                                 Security Dashboard
                             </MudNavLink>
-                            <MudNavLink Href="/admin/security" Icon="@Icons.Material.Filled.Security">
+                            <MudNavLink Href="/admin/security" Icon="@Icons.Material.Filled.VerifiedUser">
                                 Admin Security Panel
+                            </MudNavLink>
+                            <MudDivider Class="my-2" />
+                            <MudNavLink Href="/test-password-reset" Icon="@Icons.Material.Filled.BugReport">
+                                Δοκιμή Password Reset
                             </MudNavLink>
                         </ChildContent>
                     </MudNavGroup>

@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MembersHub.Core.Entities;
@@ -63,9 +63,9 @@ public class RateLimitService : IRateLimitService
             
             _logger.LogInformation("Recorded password reset attempt for email {Email} from IP {IpAddress}", email, ipAddress);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && sqlEx.Number == 2601)
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
         {
-            // Duplicate key constraint violation - handle concurrent access
+            // Duplicate key constraint violation (unique_violation) - handle concurrent access
             _logger.LogWarning("Rate limit duplicate key constraint for email {Email} from IP {IpAddress} - clearing change tracker and retrying", email, ipAddress);
             
             // Clear all tracked rate limit entities to avoid conflicts
