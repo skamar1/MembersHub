@@ -1,0 +1,66 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.vscode
+.vs
+
+# Build artifacts
+**/bin
+**/obj
+**/out
+**/.vs
+
+# Aspire
+**/.aspire
+
+# Node modules
+**/node_modules
+
+# IDE
+*.swp
+*~
+*.DotSettings.user
+*.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Documentation
+*.md
+!README.md
+
+# Docker
+Dockerfile*
+.dockerignore
+
+# Local settings
+**/*.local.json
+appsettings.Development.json
+appsettings.Local.json
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Temporary files
+**/temp
+**/tmp
+
+# Test results
+**/TestResults
+
+# NuGet packages (they will be restored)
+**/packages
+!**/packages/build
+
+# Other
+zsh-syntax-highlighting/

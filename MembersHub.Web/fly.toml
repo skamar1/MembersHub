@@ -1,0 +1,58 @@
+# fly.toml app configuration file generated for membershub-web
+# Blazor Server requires sticky sessions and always-on instances
+
+app = 'membershub-web'
+primary_region = 'ams'  # Amsterdam - closest to Greece
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[deploy]
+  strategy = 'rolling'
+
+[env]
+  ASPNETCORE_ENVIRONMENT = 'Production'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false  # Blazor Server needs to stay running for WebSocket connections
+  auto_start_machines = true
+  min_machines_running = 1     # Always keep at least 1 instance running
+
+  # Session affinity for Blazor Server (sticky sessions)
+  [http_service.concurrency]
+    type = 'connections'
+    hard_limit = 1000
+    soft_limit = 800
+
+[[services]]
+  protocol = 'tcp'
+  internal_port = 8080
+
+  [[services.ports]]
+    port = 80
+    handlers = ['http']
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ['tls', 'http']
+
+  [services.concurrency]
+    type = 'connections'
+    hard_limit = 1000
+    soft_limit = 800
+
+  [[services.http_checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/health'
+    protocol = 'http'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
