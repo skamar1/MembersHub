@@ -45,9 +45,10 @@ public class DatabaseSeeder
             {
                 Username = "admin",
                 Email = "admin@membershub.local",
-                FullName = "System Administrator",
+                FirstName = "System",
+                LastName = "Administrator",
                 PasswordHash = passwordHash,
-                Role = "Admin",
+                Role = UserRole.Admin,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
