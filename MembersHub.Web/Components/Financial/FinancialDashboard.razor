@@ -283,8 +283,8 @@
 
 @code {
     private bool loading = true;
-    private DateTime? startDate = DateTime.Now.AddMonths(-1);
-    private DateTime? endDate = DateTime.Now;
+    private DateTime? startDate = DateTime.UtcNow.AddMonths(-1);
+    private DateTime? endDate = DateTime.UtcNow;
     private string selectedPeriod = "this_month";
     private FinancialSummary? summary;
     private List<MonthlyFinancialData> monthlyData = new();
@@ -298,33 +298,33 @@
 
     private void SetCurrentMonth()
     {
-        var now = DateTime.Now;
-        startDate = new DateTime(now.Year, now.Month, 1);
+        var now = DateTime.UtcNow;
+        startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         endDate = startDate.Value.AddMonths(1).AddDays(-1);
     }
 
     private async Task OnPeriodChanged(string period)
     {
         selectedPeriod = period;
-        var now = DateTime.Now;
+        var now = DateTime.UtcNow;
 
         switch (period)
         {
             case "this_month":
-                startDate = new DateTime(now.Year, now.Month, 1);
+                startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
                 endDate = startDate.Value.AddMonths(1).AddDays(-1);
                 break;
             case "last_month":
-                startDate = new DateTime(now.Year, now.Month, 1).AddMonths(-1);
+                startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-1);
                 endDate = startDate.Value.AddMonths(1).AddDays(-1);
                 break;
             case "this_year":
-                startDate = new DateTime(now.Year, 1, 1);
-                endDate = new DateTime(now.Year, 12, 31);
+                startDate = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                endDate = new DateTime(now.Year, 12, 31, 23, 59, 59, DateTimeKind.Utc);
                 break;
             case "last_year":
-                startDate = new DateTime(now.Year - 1, 1, 1);
-                endDate = new DateTime(now.Year - 1, 12, 31);
+                startDate = new DateTime(now.Year - 1, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                endDate = new DateTime(now.Year - 1, 12, 31, 23, 59, 59, DateTimeKind.Utc);
                 break;
         }
 
@@ -369,7 +369,7 @@
                 PendingAmount = 390m,
                 OverdueAmount = 90m,
                 TotalPayments = 45,
-                GeneratedAt = DateTime.Now
+                GeneratedAt = DateTime.UtcNow
             };
 
             paymentMethodStats = new List<(string, int, decimal)>

@@ -47,25 +47,25 @@
           "dependencies": {
             "Aspire.Dashboard.Sdk.osx-arm64": {
               "target": "Package",
-              "version": "[9.3.0, )",
+              "version": "[9.5.1, )",
               "autoReferenced": true
             },
             "Aspire.Hosting.AppHost": {
               "target": "Package",
-              "version": "[9.3.0, )"
+              "version": "[9.5.1, )"
             },
             "Aspire.Hosting.Orchestration.osx-arm64": {
               "target": "Package",
-              "version": "[9.3.0, )",
+              "version": "[9.5.1, )",
               "autoReferenced": true
+            },
+            "Aspire.Hosting.PostgreSQL": {
+              "target": "Package",
+              "version": "[9.5.1, )"
             },
             "Aspire.Hosting.Redis": {
               "target": "Package",
-              "version": "[9.4.1, )"
-            },
-            "Aspire.Hosting.SqlServer": {
-              "target": "Package",
-              "version": "[9.4.1, )"
+              "version": "[9.5.1, )"
             }
           },
           "imports": [
@@ -84,7 +84,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.306/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

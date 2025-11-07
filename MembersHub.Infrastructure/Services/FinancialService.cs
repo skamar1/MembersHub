@@ -185,7 +185,7 @@ public class FinancialService : IFinancialService
 
         for (int month = 1; month <= 12; month++)
         {
-            var startDate = new DateTime(year, month, 1);
+            var startDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
             var payments = await _context.Payments
@@ -299,7 +299,7 @@ public class FinancialService : IFinancialService
             Month = month,
             Amount = amount,
             Status = SubscriptionStatus.Pending,
-            DueDate = new DateTime(year, month, DateTime.DaysInMonth(year, month))
+            DueDate = new DateTime(year, month, DateTime.DaysInMonth(year, month), 0, 0, 0, DateTimeKind.Utc)
         };
 
         return await CreateSubscriptionAsync(subscription);
@@ -397,7 +397,7 @@ public class FinancialService : IFinancialService
 
     public async Task<string> GenerateInvoiceNumberAsync()
     {
-        var year = DateTime.Now.Year;
+        var year = DateTime.UtcNow.Year;
         var count = await _context.Invoices
             .CountAsync(i => i.IssueDate.Year == year) + 1;
 
@@ -493,7 +493,7 @@ public class FinancialService : IFinancialService
         return await _context.PaymentInstallments
             .Include(pi => pi.PaymentPlan)
             .ThenInclude(pp => pp.Member)
-            .Where(pi => pi.DueDate < DateTime.Today && pi.Status == PaymentInstallmentStatus.Pending)
+            .Where(pi => pi.DueDate < DateTime.UtcNow.Date && pi.Status == PaymentInstallmentStatus.Pending)
             .OrderBy(pi => pi.DueDate)
             .ToListAsync();
     }
@@ -528,7 +528,7 @@ public class FinancialService : IFinancialService
     public async Task<List<MonthlyFinancialData>> GetYearlyTrendsAsync(int years = 5)
     {
         var trends = new List<MonthlyFinancialData>();
-        var currentYear = DateTime.Now.Year;
+        var currentYear = DateTime.UtcNow.Year;
 
         for (int i = 0; i < years; i++)
         {
