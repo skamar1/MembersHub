@@ -19,7 +19,9 @@ public static class DependencyInjection
         if (factoryDescriptor == null)
         {
             // Factory not registered - register it
-            var connectionString = configuration.GetConnectionString("membershubdb");
+            // Try DefaultConnection first (Fly.io), fallback to membershubdb (Aspire local dev)
+            var connectionString = configuration.GetConnectionString("DefaultConnection")
+                                ?? configuration.GetConnectionString("membershubdb");
 
             services.AddDbContextFactory<MembersHubContext>(options =>
             {
