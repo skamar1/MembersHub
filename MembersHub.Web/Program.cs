@@ -58,7 +58,7 @@ builder.Services.AddScoped<IHttpContextInfoService, HttpContextInfoService>();
 
 var app = builder.Build();
 
-// Apply database migrations on startup
+// Apply database migrations and seed data on startup
 using (var scope = app.Services.CreateScope())
 {
     try
@@ -70,44 +70,25 @@ using (var scope = app.Services.CreateScope())
         await context.Database.MigrateAsync();
         logger.LogInformation("Database migrations applied successfully");
 
-        // Check if this is a fresh database or has old incorrect hashes
-        var adminUser = await context.Users.FirstOrDefaultAsync(u => u.Username == "admin");
-        var correctHash = "$2a$11$Oc/hGN4tb2JwuShFyQIDDuCg6b8loRTxHA1Qi.jL3gyZTWCPZ2fcK"; // Aris100*
-        var oldIncorrectHash = "$2a$11$yH8BxJ0Tff7K9B7N.zPgWOZ"; // Prefix of old incorrect hash
+        // Seed admin user if database is empty
+        var seeder = new MembersHub.Infrastructure.Services.DatabaseSeeder(context,
+            scope.ServiceProvider.GetRequiredService<ILogger<MembersHub.Infrastructure.Services.DatabaseSeeder>>());
 
-        if (adminUser != null)
+        var generatedPassword = await seeder.SeedAdminUserIfNeededAsync();
+
+        // Clear any account lockouts during startup (for development only)
+        if (context.Database.GetConnectionString()?.Contains("localhost") == true)
         {
-            // Fix if password is empty or has the old incorrect hash
-            if (string.IsNullOrEmpty(adminUser.PasswordHash) ||
-                adminUser.PasswordHash.StartsWith(oldIncorrectHash))
+            var lockoutsCleared = await context.Database.ExecuteSqlRawAsync(@"
+                DELETE FROM ""AccountLockouts"" WHERE ""UserId"" IN (
+                    SELECT ""Id"" FROM ""Users""
+                );
+            ");
+
+            if (lockoutsCleared > 0)
             {
-                await context.Database.ExecuteSqlRawAsync(@"
-                    UPDATE ""Users"" SET ""PasswordHash"" = {0} WHERE ""Username"" = 'admin';
-                    UPDATE ""Users"" SET ""PasswordHash"" = {0} WHERE ""Username"" = 'owner';
-                    UPDATE ""Users"" SET ""PasswordHash"" = {0} WHERE ""Username"" = 'treasurer';
-                ", correctHash);
-
-                logger.LogInformation("User passwords updated with correct BCrypt hashes");
+                logger.LogInformation("Cleared {Count} account lockouts for development", lockoutsCleared);
             }
-
-            // Clear any account lockouts during startup (for development)
-            if (context.Database.GetConnectionString()?.Contains("localhost") == true)
-            {
-                var lockoutsCleared = await context.Database.ExecuteSqlRawAsync(@"
-                    DELETE FROM ""AccountLockouts"" WHERE ""UserId"" IN (
-                        SELECT ""Id"" FROM ""Users"" WHERE ""Username"" IN ('admin', 'owner', 'treasurer')
-                    );
-                ");
-
-                if (lockoutsCleared > 0)
-                {
-                    logger.LogInformation("Cleared {Count} account lockouts for default users", lockoutsCleared);
-                }
-            }
-        }
-        else
-        {
-            logger.LogInformation("No users found in database - this may be a completely empty database");
         }
     }
     catch (Exception ex)
