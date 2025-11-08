@@ -315,8 +315,8 @@
     private bool canSelectCollector = false;
 
     // Date range
-    private DateTime? startDate = DateTime.Today;
-    private DateTime? endDate = DateTime.Today;
+    private DateTime? startDate = DateTime.UtcNow.Date;
+    private DateTime? endDate = DateTime.UtcNow.Date;
     private string selectedPeriod = "today";
 
     // Financial data
@@ -413,7 +413,7 @@
     private async Task OnPeriodChanged(string period)
     {
         selectedPeriod = period;
-        var now = DateTime.Today;
+        var now = DateTime.UtcNow.Date;
 
         switch (period)
         {
@@ -428,11 +428,11 @@
                 endDate = monday.AddDays(6);
                 break;
             case "this_month":
-                startDate = new DateTime(now.Year, now.Month, 1);
+                startDate = DateTime.SpecifyKind(new DateTime(now.Year, now.Month, 1), DateTimeKind.Utc);
                 endDate = startDate.Value.AddMonths(1).AddDays(-1);
                 break;
             case "last_month":
-                startDate = new DateTime(now.Year, now.Month, 1).AddMonths(-1);
+                startDate = DateTime.SpecifyKind(new DateTime(now.Year, now.Month, 1), DateTimeKind.Utc).AddMonths(-1);
                 endDate = startDate.Value.AddMonths(1).AddDays(-1);
                 break;
         }
@@ -547,7 +547,7 @@
         if (lastDeliveryDate == null)
             return "Δεν έχει γίνει παράδοση";
 
-        var days = (DateTime.Today - lastDeliveryDate.Value.Date).Days;
+        var days = (DateTime.UtcNow.Date - lastDeliveryDate.Value.Date).Days;
         if (days == 0)
             return "Σήμερα";
         else if (days == 1)

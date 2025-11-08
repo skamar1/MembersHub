@@ -34,7 +34,8 @@
       "Bash(flyctl machine status:*)",
       "Bash(flyctl postgres connect:*)",
       "mcp__microsoft-docs-mcp__microsoft_code_sample_search",
-      "Bash(flyctl releases:*)"
+      "Bash(flyctl releases:*)",
+      "Bash(dotnet build:*)"
     ],
     "deny": [],
     "ask": []
