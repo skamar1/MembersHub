@@ -2,8 +2,10 @@
 @using MembersHub.Core.Entities
 @using MembersHub.Core.Interfaces
 @using Microsoft.AspNetCore.Authorization
+@using MembersHub.Application.Services
 @inject IFinancialService FinancialService
 @inject ISnackbar Snackbar
+@inject TimeZoneService TimeZone
 @attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
 
 <PageTitle>Financial Dashboard</PageTitle>
@@ -283,8 +285,8 @@
 
 @code {
     private bool loading = true;
-    private DateTime? startDate = DateTime.UtcNow.AddMonths(-1);
-    private DateTime? endDate = DateTime.UtcNow;
+    private DateTime? startDate;
+    private DateTime? endDate;
     private string selectedPeriod = "this_month";
     private FinancialSummary? summary;
     private List<MonthlyFinancialData> monthlyData = new();
@@ -298,33 +300,44 @@
 
     private void SetCurrentMonth()
     {
-        var now = DateTime.UtcNow;
-        startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        endDate = startDate.Value.AddMonths(1).AddDays(-1);
+        var greekNow = TimeZone.GetGreekNow();
+        var firstDay = new DateTime(greekNow.Year, greekNow.Month, 1);
+        var lastDay = firstDay.AddMonths(1).AddDays(-1);
+
+        startDate = TimeZone.ConvertToUtc(firstDay);
+        endDate = TimeZone.ConvertToUtc(lastDay.AddDays(1).AddSeconds(-1)); // End of last day
     }
 
     private async Task OnPeriodChanged(string period)
     {
         selectedPeriod = period;
-        var now = DateTime.UtcNow;
+        var greekNow = TimeZone.GetGreekNow();
 
         switch (period)
         {
             case "this_month":
-                startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-                endDate = startDate.Value.AddMonths(1).AddDays(-1);
+                var firstDay = new DateTime(greekNow.Year, greekNow.Month, 1);
+                var lastDay = firstDay.AddMonths(1).AddDays(-1);
+                startDate = TimeZone.ConvertToUtc(firstDay);
+                endDate = TimeZone.ConvertToUtc(lastDay.AddDays(1).AddSeconds(-1));
                 break;
             case "last_month":
-                startDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-1);
-                endDate = startDate.Value.AddMonths(1).AddDays(-1);
+                var lastMonthFirst = new DateTime(greekNow.Year, greekNow.Month, 1).AddMonths(-1);
+                var lastMonthLast = lastMonthFirst.AddMonths(1).AddDays(-1);
+                startDate = TimeZone.ConvertToUtc(lastMonthFirst);
+                endDate = TimeZone.ConvertToUtc(lastMonthLast.AddDays(1).AddSeconds(-1));
                 break;
             case "this_year":
-                startDate = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-                endDate = new DateTime(now.Year, 12, 31, 23, 59, 59, DateTimeKind.Utc);
+                var yearStart = new DateTime(greekNow.Year, 1, 1);
+                var yearEnd = new DateTime(greekNow.Year, 12, 31, 23, 59, 59);
+                startDate = TimeZone.ConvertToUtc(yearStart);
+                endDate = TimeZone.ConvertToUtc(yearEnd);
                 break;
             case "last_year":
-                startDate = new DateTime(now.Year - 1, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-                endDate = new DateTime(now.Year - 1, 12, 31, 23, 59, 59, DateTimeKind.Utc);
+                var lastYearStart = new DateTime(greekNow.Year - 1, 1, 1);
+                var lastYearEnd = new DateTime(greekNow.Year - 1, 12, 31, 23, 59, 59);
+                startDate = TimeZone.ConvertToUtc(lastYearStart);
+                endDate = TimeZone.ConvertToUtc(lastYearEnd);
                 break;
         }
 
@@ -369,7 +382,7 @@
                 PendingAmount = 390m,
                 OverdueAmount = 90m,
                 TotalPayments = 45,
-                GeneratedAt = DateTime.UtcNow
+                GeneratedAt = TimeZone.ConvertToUtc(TimeZone.GetGreekNow())
             };
 
             paymentMethodStats = new List<(string, int, decimal)>

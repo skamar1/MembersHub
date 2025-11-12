@@ -6,11 +6,13 @@
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using MembersHub.Application.Services
 @inject IDbContextFactory<MembersHubContext> ContextFactory
 @inject ICashierHandoverService HandoverService
 @inject ISessionService SessionService
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject TimeZoneService TimeZone
 @attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
 
 <PageTitle>Η Καρτέλα μου - MembersHub</PageTitle>
@@ -315,8 +317,8 @@
     private bool canSelectCollector = false;
 
     // Date range
-    private DateTime? startDate = DateTime.UtcNow.Date;
-    private DateTime? endDate = DateTime.UtcNow.Date;
+    private DateTime? startDate;
+    private DateTime? endDate;
     private string selectedPeriod = "today";
 
     // Financial data
@@ -337,6 +339,11 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Initialize dates to Greek today
+        var greekToday = TimeZone.GetGreekNow().Date;
+        startDate = TimeZone.ConvertToUtc(greekToday);
+        endDate = TimeZone.ConvertToUtc(greekToday.AddDays(1).AddSeconds(-1));
+
         currentUser = await SessionService.GetCurrentUserAsync();
 
         if (currentUser == null)
@@ -413,27 +420,32 @@
     private async Task OnPeriodChanged(string period)
     {
         selectedPeriod = period;
-        var now = DateTime.UtcNow.Date;
+        var greekNow = TimeZone.GetGreekNow();
+        var greekToday = greekNow.Date;
 
         switch (period)
         {
             case "today":
-                startDate = now;
-                endDate = now;
+                startDate = TimeZone.ConvertToUtc(greekToday);
+                endDate = TimeZone.ConvertToUtc(greekToday.AddDays(1).AddSeconds(-1));
                 break;
             case "this_week":
-                var dayOfWeek = (int)now.DayOfWeek;
-                var monday = dayOfWeek == 0 ? now.AddDays(-6) : now.AddDays(1 - dayOfWeek);
-                startDate = monday;
-                endDate = monday.AddDays(6);
+                var dayOfWeek = (int)greekToday.DayOfWeek;
+                var monday = dayOfWeek == 0 ? greekToday.AddDays(-6) : greekToday.AddDays(1 - dayOfWeek);
+                startDate = TimeZone.ConvertToUtc(monday);
+                endDate = TimeZone.ConvertToUtc(monday.AddDays(7).AddSeconds(-1));
                 break;
             case "this_month":
-                startDate = DateTime.SpecifyKind(new DateTime(now.Year, now.Month, 1), DateTimeKind.Utc);
-                endDate = startDate.Value.AddMonths(1).AddDays(-1);
+                var monthStart = new DateTime(greekToday.Year, greekToday.Month, 1);
+                var monthEnd = monthStart.AddMonths(1).AddSeconds(-1);
+                startDate = TimeZone.ConvertToUtc(monthStart);
+                endDate = TimeZone.ConvertToUtc(monthEnd);
                 break;
             case "last_month":
-                startDate = DateTime.SpecifyKind(new DateTime(now.Year, now.Month, 1), DateTimeKind.Utc).AddMonths(-1);
-                endDate = startDate.Value.AddMonths(1).AddDays(-1);
+                var lastMonthStart = new DateTime(greekToday.Year, greekToday.Month, 1).AddMonths(-1);
+                var lastMonthEnd = lastMonthStart.AddMonths(1).AddSeconds(-1);
+                startDate = TimeZone.ConvertToUtc(lastMonthStart);
+                endDate = TimeZone.ConvertToUtc(lastMonthEnd);
                 break;
         }
 
@@ -547,7 +559,10 @@
         if (lastDeliveryDate == null)
             return "Δεν έχει γίνει παράδοση";
 
-        var days = (DateTime.UtcNow.Date - lastDeliveryDate.Value.Date).Days;
+        var greekToday = TimeZone.GetGreekNow().Date;
+        var deliveryGreekDate = TimeZone.ConvertToGreekTime(lastDeliveryDate.Value).Date;
+        var days = (greekToday - deliveryGreekDate).Days;
+
         if (days == 0)
             return "Σήμερα";
         else if (days == 1)

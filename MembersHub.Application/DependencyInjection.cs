@@ -48,6 +48,9 @@ public static class DependencyInjection
         services.AddScoped<ICashBoxDeliveryService, CashBoxDeliveryService>();
         services.AddScoped<ICashierHandoverService, CashierHandoverService>();
 
+        // Add TimeZone service (Singleton because it's stateless and thread-safe)
+        services.AddSingleton<TimeZoneService>();
+
         return services;
     }
 }

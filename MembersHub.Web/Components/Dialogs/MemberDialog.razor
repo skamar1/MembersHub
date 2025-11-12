@@ -12,6 +12,7 @@
 @inject IAuditService AuditService
 @inject ISessionService SessionService
 @inject IHttpContextInfoService HttpContextInfo
+@inject TimeZoneService TimeZone
 
 <MudDialog Style="min-width: 800px;">
     <DialogContent>
@@ -56,7 +57,8 @@
                                           Label="Τηλέφωνο"
                                           Required="true"
                                           RequiredError="Το τηλέφωνο είναι υποχρεωτικό"
-                                          Mask="@(new PatternMask("0000000000"))"
+                                          InputType="InputType.Telephone"
+                                          HelperText="π.χ. 6912345678 ή 2101234567"
                                           Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12" sm="6">
@@ -308,7 +310,11 @@
                 GuardianEmail = existingMember.GuardianEmail,
                 MembershipTypeId = existingMember.MembershipTypeId
             };
-            dateOfBirth = existingMember.DateOfBirth;
+            // Convert UTC date from database to Greek time for display in DatePicker
+            if (existingMember.DateOfBirth.HasValue)
+            {
+                dateOfBirth = TimeZone.ConvertToGreekTime(existingMember.DateOfBirth.Value).Date;
+            }
         }
     }
 
@@ -335,11 +341,13 @@
 
         try
         {
-            // Update date of birth from picker
+            // Update date of birth from picker and convert to UTC
             if (dateOfBirth.HasValue)
             {
-                model.DateOfBirth = dateOfBirth.Value;
-                if (IsEdit) updateModel.DateOfBirth = dateOfBirth.Value;
+                // Treat date as Greek timezone date and convert to UTC for database
+                var dateOnly = new DateTime(dateOfBirth.Value.Year, dateOfBirth.Value.Month, dateOfBirth.Value.Day);
+                model.DateOfBirth = TimeZone.ConvertToUtc(dateOnly);
+                if (IsEdit) updateModel.DateOfBirth = TimeZone.ConvertToUtc(dateOnly);
             }
 
             if (IsEdit)

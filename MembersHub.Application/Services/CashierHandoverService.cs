@@ -8,10 +8,14 @@ namespace MembersHub.Application.Services;
 public class CashierHandoverService : ICashierHandoverService
 {
     private readonly IDbContextFactory<MembersHubContext> _contextFactory;
+    private readonly TimeZoneService _timeZone;
 
-    public CashierHandoverService(IDbContextFactory<MembersHubContext> contextFactory)
+    public CashierHandoverService(
+        IDbContextFactory<MembersHubContext> contextFactory,
+        TimeZoneService timeZone)
     {
         _contextFactory = contextFactory;
+        _timeZone = timeZone;
     }
 
     public async Task<CashierHandover?> GetActivePeriodAsync(int cashierId)
@@ -80,7 +84,7 @@ public class CashierHandoverService : ICashierHandoverService
             .FirstOrDefaultAsync();
 
         var periodStart = lastHandover?.PeriodEndDate ?? DateTime.MinValue;
-        var periodEnd = DateTime.Now;
+        var periodEnd = _timeZone.ConvertToUtc(_timeZone.GetGreekNow());
 
         // Calculate totals for the period
         var summary = await GetCashierCurrentPeriodSummaryAsync(cashierId);
@@ -95,7 +99,7 @@ public class CashierHandoverService : ICashierHandoverService
             NetBalance = summary.NetBalance,
             Status = HandoverStatus.Pending,
             Notes = notes,
-            CreatedDate = DateTime.Now
+            CreatedDate = _timeZone.ConvertToUtc(_timeZone.GetGreekNow())
         };
 
         context.CashierHandovers.Add(handover);
@@ -116,7 +120,7 @@ public class CashierHandoverService : ICashierHandoverService
 
         handover.Status = HandoverStatus.Confirmed;
         handover.ReceivedById = receivedById;
-        handover.ConfirmedDate = DateTime.Now;
+        handover.ConfirmedDate = _timeZone.ConvertToUtc(_timeZone.GetGreekNow());
 
         if (!string.IsNullOrWhiteSpace(notes))
         {

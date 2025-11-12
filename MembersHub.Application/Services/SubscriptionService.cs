@@ -16,15 +16,18 @@ public class SubscriptionService : ISubscriptionService
     private readonly ILogger<SubscriptionService> _logger;
     private readonly IAuditService? _auditService;
     private readonly IEmailNotificationService? _emailService;
+    private readonly TimeZoneService _timeZone;
 
     public SubscriptionService(
         MembersHubContext context,
         ILogger<SubscriptionService> logger,
+        TimeZoneService timeZone,
         IAuditService? auditService = null,
         IEmailNotificationService? emailService = null)
     {
         _context = context;
         _logger = logger;
+        _timeZone = timeZone;
         _auditService = auditService;
         _emailService = emailService;
     }
@@ -193,8 +196,9 @@ public class SubscriptionService : ISubscriptionService
                 return 0;
             }
 
-            // Calculate due date (end of month)
-            var dueDate = new DateTime(year, month, DateTime.DaysInMonth(year, month));
+            // Calculate due date (end of month in Greek timezone, stored as UTC)
+            var lastDayOfMonth = new DateTime(year, month, DateTime.DaysInMonth(year, month));
+            var dueDate = _timeZone.ConvertToUtc(lastDayOfMonth);
 
             var subscriptions = new List<Subscription>();
 
@@ -241,7 +245,8 @@ public class SubscriptionService : ISubscriptionService
 
     public async Task<IEnumerable<Subscription>> GetOverdueSubscriptionsAsync()
     {
-        var today = DateTime.Today;
+        var greekToday = _timeZone.GetGreekNow().Date;
+        var today = _timeZone.ConvertToUtc(greekToday);
 
         return await _context.Subscriptions
             .Include(s => s.Member)
@@ -324,7 +329,8 @@ public class SubscriptionService : ISubscriptionService
     {
         try
         {
-            var today = DateTime.Today;
+            var greekToday = _timeZone.GetGreekNow().Date;
+            var today = _timeZone.ConvertToUtc(greekToday);
 
             var pendingSubscriptions = await _context.Subscriptions
                 .Where(s => s.Status == SubscriptionStatus.Pending && s.DueDate < today)
@@ -460,7 +466,8 @@ public class SubscriptionService : ISubscriptionService
         if (subscription.MemberId <= 0)
             errors.Add("Το μέλος είναι υποχρεωτικό");
 
-        if (subscription.Year < 2020 || subscription.Year > DateTime.Now.Year + 5)
+        var currentGreekYear = _timeZone.GetGreekNow().Year;
+        if (subscription.Year < 2020 || subscription.Year > currentGreekYear + 5)
             errors.Add("Μη έγκυρο έτος");
 
         if (subscription.Month < 1 || subscription.Month > 12)
@@ -501,8 +508,10 @@ public class SubscriptionService : ISubscriptionService
             _ => "χρειάζεται πληρωμή"
         };
 
+        var greekToday = _timeZone.GetGreekNow().Date;
+        var dueDateGreek = _timeZone.ConvertToGreekTime(subscription.DueDate).Date;
         var daysOverdue = subscription.Status == SubscriptionStatus.Overdue
-            ? (DateTime.Today - subscription.DueDate).Days
+            ? (greekToday - dueDateGreek).Days
             : 0;
 
         return $@"

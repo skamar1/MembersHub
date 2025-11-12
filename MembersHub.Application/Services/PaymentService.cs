@@ -16,15 +16,18 @@ public class PaymentService : IPaymentService
     private readonly ILogger<PaymentService> _logger;
     private readonly IAuditService? _auditService;
     private readonly IEmailNotificationService? _emailService;
+    private readonly TimeZoneService _timeZone;
 
     public PaymentService(
         MembersHubContext context,
         ILogger<PaymentService> logger,
+        TimeZoneService timeZone,
         IAuditService? auditService = null,
         IEmailNotificationService? emailService = null)
     {
         _context = context;
         _logger = logger;
+        _timeZone = timeZone;
         _auditService = auditService;
         _emailService = emailService;
     }
@@ -116,8 +119,10 @@ public class PaymentService : IPaymentService
 
     public async Task<decimal> GetTodayCollectionsAsync(int? collectorId = null)
     {
-        var today = DateTime.Today;
-        var tomorrow = today.AddDays(1);
+        // Get today's date range in Greek timezone, converted to UTC for database query
+        var greekToday = _timeZone.GetGreekNow().Date;
+        var today = _timeZone.ConvertToUtc(greekToday);
+        var tomorrow = _timeZone.ConvertToUtc(greekToday.AddDays(1));
 
         var query = _context.Payments
             .Where(p => p.PaymentDate >= today && p.PaymentDate < tomorrow && p.Status == PaymentStatus.Confirmed);
@@ -255,7 +260,7 @@ public class PaymentService : IPaymentService
 
     private async Task<string> GenerateReceiptNumberAsync()
     {
-        var year = DateTime.Now.Year;
+        var year = _timeZone.GetGreekNow().Year;
         var prefix = $"REC-{year}-";
 
         // Find the last receipt number for this year

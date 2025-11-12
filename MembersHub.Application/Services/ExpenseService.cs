@@ -16,17 +16,20 @@ public class ExpenseService : IExpenseService
     private readonly ILogger<ExpenseService> _logger;
     private readonly IAuditService _auditService;
     private readonly IEmailNotificationService _emailService;
+    private readonly TimeZoneService _timeZone;
 
     public ExpenseService(
         MembersHubContext context,
         ILogger<ExpenseService> logger,
         IAuditService auditService,
-        IEmailNotificationService emailService)
+        IEmailNotificationService emailService,
+        TimeZoneService timeZone)
     {
         _context = context;
         _logger = logger;
         _auditService = auditService;
         _emailService = emailService;
+        _timeZone = timeZone;
     }
 
     #region CRUD Operations
@@ -341,7 +344,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<string> GenerateExpenseNumberAsync()
     {
-        var currentYear = DateTime.Now.Year;
+        var currentYear = _timeZone.GetGreekNow().Year;
         var lastExpense = await _context.Expenses
             .Where(e => e.ExpenseNumber.StartsWith($"EXP-{currentYear}-"))
             .OrderByDescending(e => e.ExpenseNumber)
@@ -570,7 +573,7 @@ public class ExpenseService : IExpenseService
 
         for (int month = 1; month <= 12; month++)
         {
-            var startDate = new DateTime(year, month, 1);
+            var startDate = DateTime.SpecifyKind(new DateTime(year, month, 1), DateTimeKind.Utc);
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
             var total = await GetTotalExpensesAsync(startDate, endDate);
@@ -625,10 +628,13 @@ public class ExpenseService : IExpenseService
         if (string.IsNullOrWhiteSpace(expense.Description))
             errors.Add("Η περιγραφή είναι υποχρεωτική");
 
-        if (expense.Date > DateTime.Now.Date)
+        var greekToday = _timeZone.GetGreekNow().Date;
+        var expenseGreekDate = _timeZone.ConvertToGreekTime(expense.Date).Date;
+
+        if (expenseGreekDate > greekToday)
             errors.Add("Η ημερομηνία δεν μπορεί να είναι μελλοντική");
 
-        if (expense.Date < DateTime.Now.AddYears(-2))
+        if (expenseGreekDate < greekToday.AddYears(-2))
             errors.Add("Η ημερομηνία δεν μπορεί να είναι παλαιότερη των 2 ετών");
 
         if (expense.SubmittedBy <= 0)
@@ -644,7 +650,7 @@ public class ExpenseService : IExpenseService
 
     private async Task<string> GenerateTransactionNumberAsync()
     {
-        var currentYear = DateTime.Now.Year;
+        var currentYear = _timeZone.GetGreekNow().Year;
         var lastTransaction = await _context.FinancialTransactions
             .Where(t => t.TransactionNumber.StartsWith($"TXN-{currentYear}-"))
             .OrderByDescending(t => t.TransactionNumber)
@@ -706,7 +712,7 @@ public class ExpenseService : IExpenseService
                 <p><strong>Αριθμός:</strong> {expense.ExpenseNumber}</p>
                 <p><strong>Ποσό:</strong> {expense.Amount:C}</p>
                 <p><strong>Κατάσταση:</strong> {status}</p>
-                <p><strong>Ημερομηνία απόφασης:</strong> {DateTime.Now:dd/MM/yyyy HH:mm}</p>
+                <p><strong>Ημερομηνία απόφασης:</strong> {_timeZone.FormatGreekDateTime(_timeZone.ConvertToUtc(_timeZone.GetGreekNow()))}</p>
                 {(notes != null ? $"<p><strong>Σχόλια:</strong> {notes}</p>" : "")}
                 <p>Μπορείτε να δείτε περισσότερες λεπτομέρειες συνδεόμενος στο σύστημα.</p>
             ";
