@@ -26,8 +26,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS final
 WORKDIR /app
 EXPOSE 8080
 
-# Install required dependencies for globalization
-RUN apk add --no-cache icu-libs
+# Install required dependencies for globalization and timezone data
+RUN apk add --no-cache icu-libs tzdata
 
 # Set environment variables
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
