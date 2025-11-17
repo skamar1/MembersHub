@@ -1,11 +1,15 @@
 using MembersHub.Web.Components;
 using MembersHub.Infrastructure;
 using MembersHub.Application;
+using MudBlazor;
 using MudBlazor.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Components.Authorization;
 using MembersHub.Web.Services;
 using MembersHub.Core.Interfaces;
+using System.Globalization;
+using Microsoft.AspNetCore.Localization;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,12 +28,25 @@ builder.AddServiceDefaults();
 // Add Redis distributed caching
 builder.AddRedisDistributedCache("cache");
 
+// Configure localization for Greek
+var supportedCultures = new[] { new CultureInfo("el-GR") };
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture("el-GR");
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+});
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Add MudBlazor services
-builder.Services.AddMudServices();
+// Add MudBlazor services with Greek localization
+builder.Services.AddMudServices(config =>
+{
+    config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.BottomRight;
+})
+.AddMudLocalization();
 
 // Add Infrastructure services (without DbContext - handled by Aspire above)
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -120,6 +137,9 @@ else
 
 // Add status code pages for 404 and other errors
 app.UseStatusCodePagesWithReExecute("/Error/{0}");
+
+// Use request localization for Greek culture
+app.UseRequestLocalization(app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value);
 
 app.UseHttpsRedirection();
 
