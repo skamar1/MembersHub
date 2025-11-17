@@ -84,35 +84,26 @@
 
         <!-- Desktop Data Table -->
         <MudHidden Breakpoint="Breakpoint.SmAndDown">
-            <MudDataGrid Items="@filteredMembers" 
-                     Dense="true" 
-                     Hover="true" 
-                     Bordered="true" 
+            <MudDataGrid Items="@filteredMembers"
+                     Dense="true"
+                     Hover="true"
+                     Bordered="true"
                      Striped="true"
                      Loading="@loading"
                      LoadingProgressColor="Color.Primary"
+                     ColumnSpacing="1"
                      Class="thick-borders">
             <Columns>
                 <PropertyColumn Property="x => x.MemberNumber" Title="Αριθμός" />
-                <PropertyColumn Property="x => x.FullName" Title="Ονοματεπώνυμο" />
+                <PropertyColumn Property="x => x.LastName" Title="Επώνυμο" />
+                <PropertyColumn Property="x => x.FirstName" Title="Όνομα" />
                 <PropertyColumn Property="x => x.Phone" Title="Τηλέφωνο" />
                 <PropertyColumn Property="x => x.Email" Title="Email" />
-                <TemplateColumn Title="Φύλο">
-                    <CellTemplate>
-                        @if (context.Item.Gender.HasValue)
-                        {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Default">
-                                @GetGenderText(context.Item.Gender.Value)
-                            </MudChip>
-                        }
-                    </CellTemplate>
-                </TemplateColumn>
-                <PropertyColumn Property="x => x.City" Title="Πόλη" />
-                <PropertyColumn Property="x => x.MembershipType.Name" Title="Τύπος Συνδρομής" />
+                <PropertyColumn Property="x => x.Department" Title="Τμήμα" />
                 <PropertyColumn Property="x => x.MembershipType.MonthlyFee" Title="Μηνιαία Συνδρομή" Format="C2" />
                 <TemplateColumn Title="Κατάσταση">
                     <CellTemplate>
-                        <MudChip T="string" Size="Size.Small" 
+                        <MudChip T="string" Size="Size.Small"
                                  Color="@GetStatusColor(context.Item.Status)">
                             @GetStatusText(context.Item.Status)
                         </MudChip>
@@ -126,11 +117,11 @@
                 <TemplateColumn Title="Ενέργειες" Sortable="false">
                     <CellTemplate>
                         <div class="d-flex gap-2">
-                            <MudIconButton Icon="@Icons.Material.Filled.Edit" 
-                                           Size="Size.Small" 
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Size="Size.Small"
                                            Color="Color.Primary"
                                            Variant="Variant.Filled"
-                                           OnClick="() => EditMember(context.Item)" 
+                                           OnClick="() => EditMember(context.Item)"
                                            title="Επεξεργασία" />
                             <MudIconButton Icon="@Icons.Material.Filled.AccountBalance"
                                            Size="Size.Small"
@@ -138,8 +129,8 @@
                                            Variant="Variant.Filled"
                                            OnClick="() => ViewMemberCard(context.Item)"
                                            title="Καρτέλα Μέλους" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
-                                           Size="Size.Small" 
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Size="Size.Small"
                                            Color="Color.Error"
                                            Variant="Variant.Filled"
                                            OnClick="() => DeleteMember(context.Item)"
@@ -377,19 +368,32 @@
     
     private async Task DeleteMember(Member member)
     {
-        var result = await DialogService.ShowMessageBox(
-            "Διαγραφή Μέλους",
-            $"Είστε σίγουροι ότι θέλετε να διαγράψετε το μέλος '{member.FullName}'?",
-            yesText: "Διαγραφή",
-            cancelText: "Άκυρο");
-            
-        if (result == true)
+        try
         {
-            try
+            using var scope = ScopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<MembersHubContext>();
+
+            // Check if member has any payments
+            var hasPayments = await dbContext.Payments.AnyAsync(p => p.MemberId == member.Id);
+
+            if (hasPayments)
             {
-                using var scope = ScopeFactory.CreateScope();
-                var dbContext = scope.ServiceProvider.GetRequiredService<MembersHubContext>();
-                
+                await DialogService.ShowMessageBox(
+                    "Αδυναμία Διαγραφής",
+                    $"Το μέλος '{member.FullName}' δεν μπορεί να διαγραφεί επειδή έχει συνδεδεμένες συναλλαγές (πληρωμές). " +
+                    $"Για να διαγράψετε αυτό το μέλος, πρέπει πρώτα να διαγράψετε ή να μεταφέρετε όλες τις συναλλαγές του.",
+                    yesText: "Εντάξει");
+                return;
+            }
+
+            var result = await DialogService.ShowMessageBox(
+                "Διαγραφή Μέλους",
+                $"Είστε σίγουροι ότι θέλετε να διαγράψετε το μέλος '{member.FullName}'?",
+                yesText: "Διαγραφή",
+                cancelText: "Άκυρο");
+
+            if (result == true)
+            {
                 var memberToDelete = await dbContext.Members.FindAsync(member.Id);
                 if (memberToDelete != null)
                 {
@@ -397,22 +401,22 @@
                     var currentUser = await SessionService.GetCurrentUserAsync();
                     if (currentUser != null)
                     {
-                        await AuditService.LogDeleteAsync(memberToDelete, 
-                            currentUser.Id, currentUser.Username, currentUser.FullName, 
+                        await AuditService.LogDeleteAsync(memberToDelete,
+                            currentUser.Id, currentUser.Username, currentUser.FullName,
                             HttpContextInfo.GetIpAddress());
                     }
-                    
+
                     dbContext.Members.Remove(memberToDelete);
                     await dbContext.SaveChangesAsync();
+
+                    await LoadData();
+                    Snackbar.Add($"Το μέλος '{member.FullName}' διαγράφηκε επιτυχώς", Severity.Success);
                 }
-                
-                await LoadData();
-                Snackbar.Add($"Το μέλος '{member.FullName}' διαγράφηκε επιτυχώς", Severity.Success);
             }
-            catch (Exception ex)
-            {
-                Snackbar.Add($"Σφάλμα διαγραφής: {ex.Message}", Severity.Error);
-            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα διαγραφής: {ex.Message}", Severity.Error);
         }
     }
 }

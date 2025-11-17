@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "pGAnFR2mEgA=",
+  "dgSpecHash": "1GZl3YiQ9Xs=",
   "success": true,
   "projectFilePath": "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.AppHost/MembersHub.AppHost.csproj",
   "expectedPackageFiles": [
@@ -74,7 +74,10 @@
     "/Users/arisskamagakis/.nuget/packages/system.diagnostics.eventlog/9.0.9/system.diagnostics.eventlog.9.0.9.nupkg.sha512",
     "/Users/arisskamagakis/.nuget/packages/system.io.hashing/9.0.8/system.io.hashing.9.0.8.nupkg.sha512",
     "/Users/arisskamagakis/.nuget/packages/system.io.pipelines/8.0.0/system.io.pipelines.8.0.0.nupkg.sha512",
-    "/Users/arisskamagakis/.nuget/packages/yamldotnet/16.3.0/yamldotnet.16.3.0.nupkg.sha512"
+    "/Users/arisskamagakis/.nuget/packages/yamldotnet/16.3.0/yamldotnet.16.3.0.nupkg.sha512",
+    "/Users/arisskamagakis/.nuget/packages/microsoft.netcore.app.ref/9.0.11/microsoft.netcore.app.ref.9.0.11.nupkg.sha512",
+    "/Users/arisskamagakis/.nuget/packages/microsoft.aspnetcore.app.ref/9.0.11/microsoft.aspnetcore.app.ref.9.0.11.nupkg.sha512",
+    "/Users/arisskamagakis/.nuget/packages/microsoft.netcore.app.host.osx-arm64/9.0.11/microsoft.netcore.app.host.osx-arm64.9.0.11.nupkg.sha512"
   ],
   "logs": []
 }

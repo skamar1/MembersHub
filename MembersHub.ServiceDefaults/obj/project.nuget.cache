@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "j7opyFBvUag=",
+  "dgSpecHash": "jEgSe2n5+2M=",
   "success": true,
   "projectFilePath": "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.ServiceDefaults/MembersHub.ServiceDefaults.csproj",
   "expectedPackageFiles": [
@@ -46,7 +46,9 @@
     "/Users/arisskamagakis/.nuget/packages/polly.ratelimiting/8.4.2/polly.ratelimiting.8.4.2.nupkg.sha512",
     "/Users/arisskamagakis/.nuget/packages/system.diagnostics.diagnosticsource/9.0.0/system.diagnostics.diagnosticsource.9.0.0.nupkg.sha512",
     "/Users/arisskamagakis/.nuget/packages/system.io.pipelines/9.0.4/system.io.pipelines.9.0.4.nupkg.sha512",
-    "/Users/arisskamagakis/.nuget/packages/system.threading.ratelimiting/8.0.0/system.threading.ratelimiting.8.0.0.nupkg.sha512"
+    "/Users/arisskamagakis/.nuget/packages/system.threading.ratelimiting/8.0.0/system.threading.ratelimiting.8.0.0.nupkg.sha512",
+    "/Users/arisskamagakis/.nuget/packages/microsoft.netcore.app.ref/9.0.11/microsoft.netcore.app.ref.9.0.11.nupkg.sha512",
+    "/Users/arisskamagakis/.nuget/packages/microsoft.aspnetcore.app.ref/9.0.11/microsoft.aspnetcore.app.ref.9.0.11.nupkg.sha512"
   ],
   "logs": []
 }

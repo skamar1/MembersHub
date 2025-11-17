@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "4s5a3dMkrCY=",
+  "dgSpecHash": "KQuMPa13E+g=",
   "success": true,
   "projectFilePath": "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.Application/MembersHub.Application.csproj",
   "expectedPackageFiles": [
@@ -59,7 +59,9 @@
     "/Users/arisskamagakis/.nuget/packages/opentelemetry.api.providerbuilderextensions/1.9.0/opentelemetry.api.providerbuilderextensions.1.9.0.nupkg.sha512",
     "/Users/arisskamagakis/.nuget/packages/opentelemetry.extensions.hosting/1.9.0/opentelemetry.extensions.hosting.1.9.0.nupkg.sha512",
     "/Users/arisskamagakis/.nuget/packages/system.diagnostics.diagnosticsource/8.0.0/system.diagnostics.diagnosticsource.8.0.0.nupkg.sha512",
-    "/Users/arisskamagakis/.nuget/packages/system.identitymodel.tokens.jwt/8.14.0/system.identitymodel.tokens.jwt.8.14.0.nupkg.sha512"
+    "/Users/arisskamagakis/.nuget/packages/system.identitymodel.tokens.jwt/8.14.0/system.identitymodel.tokens.jwt.8.14.0.nupkg.sha512",
+    "/Users/arisskamagakis/.nuget/packages/microsoft.netcore.app.ref/9.0.11/microsoft.netcore.app.ref.9.0.11.nupkg.sha512",
+    "/Users/arisskamagakis/.nuget/packages/microsoft.aspnetcore.app.ref/9.0.11/microsoft.aspnetcore.app.ref.9.0.11.nupkg.sha512"
   ],
   "logs": []
 }

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "8ENwTFym2go=",
+  "dgSpecHash": "WT5U4gWEy1Q=",
   "success": true,
   "projectFilePath": "/Users/arisskamagakis/1Projects/MembersHub/MembersHub.ApiService/MembersHub.ApiService.csproj",
   "expectedPackageFiles": [
@@ -119,7 +119,10 @@
     "/Users/arisskamagakis/.nuget/packages/system.runtime.compilerservices.unsafe/6.0.0/system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
     "/Users/arisskamagakis/.nuget/packages/system.text.json/9.0.9/system.text.json.9.0.9.nupkg.sha512",
     "/Users/arisskamagakis/.nuget/packages/system.threading.channels/7.0.0/system.threading.channels.7.0.0.nupkg.sha512",
-    "/Users/arisskamagakis/.nuget/packages/system.threading.ratelimiting/8.0.0/system.threading.ratelimiting.8.0.0.nupkg.sha512"
+    "/Users/arisskamagakis/.nuget/packages/system.threading.ratelimiting/8.0.0/system.threading.ratelimiting.8.0.0.nupkg.sha512",
+    "/Users/arisskamagakis/.nuget/packages/microsoft.netcore.app.ref/9.0.11/microsoft.netcore.app.ref.9.0.11.nupkg.sha512",
+    "/Users/arisskamagakis/.nuget/packages/microsoft.aspnetcore.app.ref/9.0.11/microsoft.aspnetcore.app.ref.9.0.11.nupkg.sha512",
+    "/Users/arisskamagakis/.nuget/packages/microsoft.netcore.app.host.osx-arm64/9.0.11/microsoft.netcore.app.host.osx-arm64.9.0.11.nupkg.sha512"
   ],
   "logs": []
 }
