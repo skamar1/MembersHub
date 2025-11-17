@@ -9,9 +9,14 @@ using MembersHub.Core.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure for Fly.io deployment (reads PORT environment variable)
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+// Configure for Fly.io deployment ONLY (when PORT environment variable is set)
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
+{
+    // Running on Fly.io - use the PORT environment variable
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
+// Otherwise, use launchSettings.json or Aspire configuration for local development
 
 // Add Aspire service defaults
 builder.AddServiceDefaults();
