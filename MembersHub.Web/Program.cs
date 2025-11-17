@@ -45,8 +45,10 @@ builder.Services.AddRazorComponents()
 builder.Services.AddMudServices(config =>
 {
     config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.BottomRight;
-})
-.AddMudLocalization();
+});
+
+// Add Greek localization interceptor
+builder.Services.AddScoped<ILocalizationInterceptor, MembersHub.Web.Services.GreekLocalizationInterceptor>();
 
 // Add Infrastructure services (without DbContext - handled by Aspire above)
 builder.Services.AddInfrastructure(builder.Configuration);
