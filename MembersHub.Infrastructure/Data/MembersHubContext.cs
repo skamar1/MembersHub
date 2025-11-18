@@ -14,6 +14,7 @@ public class MembersHubContext : DbContext
     public DbSet<User> Users { get; set; } = null!;
     public DbSet<Member> Members { get; set; } = null!;
     public DbSet<MembershipType> MembershipTypes { get; set; } = null!;
+    public DbSet<Department> Departments { get; set; } = null!;
     public DbSet<Subscription> Subscriptions { get; set; } = null!;
     public DbSet<Payment> Payments { get; set; } = null!;
     public DbSet<Expense> Expenses { get; set; } = null!;
@@ -69,11 +70,24 @@ public class MembersHubContext : DbContext
             entity.Property(e => e.MemberNumber).HasMaxLength(20).IsRequired();
             entity.HasIndex(e => e.MemberNumber).IsUnique();
             entity.Property(e => e.Status).HasConversion<string>();
-            
+
             entity.HasOne(e => e.MembershipType)
                 .WithMany(mt => mt.Members)
                 .HasForeignKey(e => e.MembershipTypeId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Department)
+                .WithMany(d => d.Members)
+                .HasForeignKey(e => e.DepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Department configuration
+        modelBuilder.Entity<Department>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.Name).IsUnique();
         });
 
         // MembershipType configuration
@@ -133,7 +147,7 @@ public class MembersHubContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.IconName).HasMaxLength(50);
+            entity.Property(e => e.IconName).HasMaxLength(1000);
             entity.Property(e => e.ColorCode).HasMaxLength(7); // #RRGGBB
 
             entity.HasIndex(e => e.Name).IsUnique();
@@ -566,6 +580,15 @@ public class MembersHubContext : DbContext
 
     private void SeedData(ModelBuilder modelBuilder)
     {
+        // Seed departments
+        modelBuilder.Entity<Department>().HasData(
+            new Department { Id = 1, Name = "Καλαθοσφαίριση", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Department { Id = 2, Name = "Ποδόσφαιρο", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Department { Id = 3, Name = "Βόλεϊ", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Department { Id = 4, Name = "Στίβος", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Department { Id = 5, Name = "Κολύμβηση", IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) }
+        );
+
         // Seed membership types
         modelBuilder.Entity<MembershipType>().HasData(
             new MembershipType { Id = 1, Name = "Ενήλικες", MonthlyFee = 30, Description = "Μέλη άνω των 18 ετών", IsActive = true },

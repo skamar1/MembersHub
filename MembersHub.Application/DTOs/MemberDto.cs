@@ -34,7 +34,7 @@ public class CreateMemberDto
 
     // Application Information
     public string? ApplicationNumber { get; set; }
-    public string? Department { get; set; }
+    public int? DepartmentId { get; set; }
 
     // Parents Information
     public string? FatherFullName { get; set; }
@@ -70,7 +70,7 @@ public class CreateMemberDto
             DateOfBirth = DateOfBirth,
             Gender = Gender,
             ApplicationNumber = ApplicationNumber,
-            Department = Department,
+            DepartmentId = DepartmentId,
             FatherFullName = FatherFullName,
             MotherFullName = MotherFullName,
             Address = Address,
@@ -103,7 +103,7 @@ public class UpdateMemberDto
 
     // Application Information
     public string? ApplicationNumber { get; set; }
-    public string? Department { get; set; }
+    public int? DepartmentId { get; set; }
 
     // Parents Information
     public string? FatherFullName { get; set; }

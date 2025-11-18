@@ -63,7 +63,8 @@ public class MembershipTypeService : IMembershipTypeService
     {
         try
         {
-            var existingType = await _context.MembershipTypes.AsNoTracking()
+            // Load the existing entity from the database
+            var existingType = await _context.MembershipTypes
                 .FirstOrDefaultAsync(mt => mt.Id == membershipType.Id);
 
             if (existingType == null)
@@ -73,7 +74,12 @@ public class MembershipTypeService : IMembershipTypeService
 
             await ValidateMembershipTypeAsync(membershipType, isUpdate: true);
 
-            _context.MembershipTypes.Update(membershipType);
+            // Update only the properties we want to change
+            existingType.Name = membershipType.Name;
+            existingType.MonthlyFee = membershipType.MonthlyFee;
+            existingType.Description = membershipType.Description;
+            existingType.IsActive = membershipType.IsActive;
+
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Updated membership type {Id}: {Name}", membershipType.Id, membershipType.Name);
@@ -89,18 +95,20 @@ public class MembershipTypeService : IMembershipTypeService
     {
         try
         {
+            // Check if there are any members assigned first
+            var memberCount = await _context.Members.CountAsync(m => m.MembershipTypeId == id);
+            if (memberCount > 0)
+            {
+                throw new InvalidOperationException("Cannot delete membership type that has members assigned to it.");
+            }
+
+            // Load the entity fresh from the database
             var membershipType = await _context.MembershipTypes
-                .Include(mt => mt.Members)
                 .FirstOrDefaultAsync(mt => mt.Id == id);
 
             if (membershipType == null)
             {
                 throw new InvalidOperationException($"Membership type with ID {id} not found.");
-            }
-
-            if (membershipType.Members.Any())
-            {
-                throw new InvalidOperationException("Cannot delete membership type that has members assigned to it.");
             }
 
             _context.MembershipTypes.Remove(membershipType);

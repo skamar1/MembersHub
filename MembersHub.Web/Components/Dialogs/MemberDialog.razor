@@ -101,22 +101,23 @@
                                               Variant="Variant.Outlined" />
                             </MudItem>
                         }
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="int?" @bind-Value="model.DepartmentId"
+                                       Label="Τμήμα"
+                                       Variant="Variant.Outlined"
+                                       Clearable="true">
+                                @foreach (var dept in departments)
+                                {
+                                    <MudSelectItem T="int?" Value="@dept.Id">@dept.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
                     </MudGrid>
                 </MudTabPanel>
 
-                <!-- Application & Parents Tab -->
-                <MudTabPanel Text="Αίτηση & Γονείς" Icon="@Icons.Material.Filled.FamilyRestroom">
+                <!-- Parents & Guardian Tab -->
+                <MudTabPanel Text="Γονείς & Κηδεμόνας" Icon="@Icons.Material.Filled.FamilyRestroom">
                     <MudGrid Spacing="3">
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="model.ApplicationNumber"
-                                          Label="Αριθμός Αίτησης"
-                                          Variant="Variant.Outlined" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="model.Department"
-                                          Label="Τμήμα"
-                                          Variant="Variant.Outlined" />
-                        </MudItem>
                         <MudItem xs="12">
                             <MudDivider Class="my-3">
                                 <MudText Typo="Typo.subtitle2">Στοιχεία Γονέων</MudText>
@@ -130,6 +131,33 @@
                         <MudItem xs="12" sm="6">
                             <MudTextField @bind-Value="model.MotherFullName"
                                           Label="Όνομα και Επώνυμο Μητρός"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudDivider Class="my-3">
+                                <MudText Typo="Typo.subtitle2">Στοιχεία Κηδεμόνα</MudText>
+                            </MudDivider>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.GuardianFullName"
+                                          Label="Όνομα και Επώνυμο Κηδεμόνα"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.GuardianPhone"
+                                          Label="Τηλέφωνο Κηδεμόνα"
+                                          Mask="@(new PatternMask("0000000000"))"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.GuardianEmail"
+                                          Label="Email Κηδεμόνα"
+                                          InputType="InputType.Email"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="model.GuardianTaxNumber"
+                                          Label="ΑΦΜ Κηδεμόνα"
                                           Variant="Variant.Outlined" />
                         </MudItem>
                     </MudGrid>
@@ -176,36 +204,6 @@
                     </MudGrid>
                 </MudTabPanel>
 
-                <!-- Guardian Information Tab (for minors) -->
-                <MudTabPanel Text="Στοιχεία Κηδεμόνα" Icon="@Icons.Material.Filled.Shield">
-                    <MudAlert Severity="Severity.Info" Class="mb-4">
-                        Συμπληρώστε τα στοιχεία κηδεμόνα για ανήλικα μέλη (κάτω των 18 ετών).
-                    </MudAlert>
-                    <MudGrid Spacing="3">
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="model.GuardianFullName"
-                                          Label="Όνομα και Επώνυμο Κηδεμόνα"
-                                          Variant="Variant.Outlined" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="model.GuardianPhone"
-                                          Label="Τηλέφωνο Κηδεμόνα"
-                                          Mask="@(new PatternMask("0000000000"))"
-                                          Variant="Variant.Outlined" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="model.GuardianEmail"
-                                          Label="Email Κηδεμόνα"
-                                          InputType="InputType.Email"
-                                          Variant="Variant.Outlined" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="model.GuardianTaxNumber"
-                                          Label="ΑΦΜ Κηδεμόνα"
-                                          Variant="Variant.Outlined" />
-                        </MudItem>
-                    </MudGrid>
-                </MudTabPanel>
             </MudTabs>
         </MudForm>
     </DialogContent>
@@ -246,14 +244,20 @@
     private Member? existingMember;
     private DateTime? dateOfBirth;
     private List<MembershipType> membershipTypes = new();
+    private List<Department> departments = new();
 
     protected override async Task OnInitializedAsync()
     {
-        // Load membership types
+        // Load membership types and departments
         using var context = ContextFactory.CreateDbContext();
         membershipTypes = await context.MembershipTypes
             .Where(mt => mt.IsActive)
             .OrderBy(mt => mt.Name)
+            .ToListAsync();
+
+        departments = await context.Departments
+            .Where(d => d.IsActive)
+            .OrderBy(d => d.Name)
             .ToListAsync();
 
         if (IsEdit && ExistingMember != null)
@@ -270,7 +274,7 @@
                 DateOfBirth = existingMember.DateOfBirth,
                 Gender = existingMember.Gender,
                 ApplicationNumber = existingMember.ApplicationNumber,
-                Department = existingMember.Department,
+                DepartmentId = existingMember.DepartmentId,
                 FatherFullName = existingMember.FatherFullName,
                 MotherFullName = existingMember.MotherFullName,
                 Address = existingMember.Address,
@@ -295,7 +299,7 @@
                 DateOfBirth = existingMember.DateOfBirth,
                 Gender = existingMember.Gender,
                 ApplicationNumber = existingMember.ApplicationNumber,
-                Department = existingMember.Department,
+                DepartmentId = existingMember.DepartmentId,
                 FatherFullName = existingMember.FatherFullName,
                 MotherFullName = existingMember.MotherFullName,
                 Address = existingMember.Address,
@@ -372,7 +376,7 @@
 
                     // Application Information
                     member.ApplicationNumber = model.ApplicationNumber;
-                    member.Department = model.Department;
+                    member.DepartmentId = model.DepartmentId;
 
                     // Parents Information
                     member.FatherFullName = model.FatherFullName;

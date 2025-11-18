@@ -101,7 +101,14 @@
                 <PropertyColumn Property="x => x.FirstName" Title="Όνομα" />
                 <PropertyColumn Property="x => x.Phone" Title="Τηλέφωνο" />
                 <PropertyColumn Property="x => x.Email" Title="Email" />
-                <PropertyColumn Property="x => x.Department" Title="Τμήμα" />
+                <TemplateColumn Title="Τμήμα">
+                    <CellTemplate>
+                        @(context.Item.Department?.Name ?? "-")
+                    </CellTemplate>
+                    <FilterTemplate>
+                        <MudTextField T="string" @bind-Value="departmentFilter" Placeholder="Φίλτρο..." Variant="Variant.Text" Margin="Margin.Dense" />
+                    </FilterTemplate>
+                </TemplateColumn>
                 <PropertyColumn Property="x => x.MembershipType.MonthlyFee" Title="Μηνιαία Συνδρομή" Format="C2" />
                 <TemplateColumn Title="Κατάσταση">
                     <CellTemplate>
@@ -229,6 +236,7 @@
     private string searchString = "";
     private int selectedMembershipType = 0;
     private string? selectedStatus = null;
+    private string departmentFilter = "";
     
     private int totalMembers => members.Count;
     private int activeMembers => members.Count(m => m.Status == MemberStatus.Active);
@@ -240,7 +248,9 @@
          (m.Email?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
          m.MemberNumber.Contains(searchString, StringComparison.OrdinalIgnoreCase)) &&
         (selectedMembershipType == 0 || m.MembershipTypeId == selectedMembershipType) &&
-        (selectedStatus == null || m.Status.ToString() == selectedStatus)
+        (selectedStatus == null || m.Status.ToString() == selectedStatus) &&
+        (string.IsNullOrWhiteSpace(departmentFilter) ||
+         (m.Department?.Name?.Contains(departmentFilter, StringComparison.OrdinalIgnoreCase) ?? false))
     );
     
     protected override async Task OnInitializedAsync()
@@ -259,6 +269,7 @@
             
             members = await dbContext.Members
                 .Include(m => m.MembershipType)
+                .Include(m => m.Department)
                 .OrderBy(m => m.MemberNumber)
                 .ToListAsync();
                 

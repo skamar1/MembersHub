@@ -1,0 +1,124 @@
+@using MembersHub.Core.Entities
+@using MembersHub.Core.Interfaces
+@using MudBlazor
+@using Microsoft.AspNetCore.Components
+@inject IDepartmentService DepartmentService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success">
+            <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="department.Name"
+                                  Label="Όνομα Τμήματος"
+                                  Required="true"
+                                  RequiredError="Το όνομα είναι υποχρεωτικό"
+                                  MaxLength="100"
+                                  HelperText="π.χ. Καλαθοσφαίριση, Ποδόσφαιρο"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch @bind-Value="department.IsActive"
+                               Label="Ενεργό"
+                               Color="Color.Success" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Ακύρωση</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@processing">
+            @if (processing)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Αποθήκευση...</MudText>
+            }
+            else
+            {
+                <MudText>@(IsEdit ? "Ενημέρωση" : "Δημιουργία")</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Department Department { get; set; } = new();
+
+    [Parameter]
+    public bool IsEdit { get; set; }
+
+    private Department department = new();
+    private MudForm form = null!;
+    private bool success;
+    private bool processing = false;
+
+    protected override void OnInitialized()
+    {
+        department = new Department
+        {
+            Id = Department.Id,
+            Name = Department.Name,
+            IsActive = Department.IsActive,
+            CreatedAt = Department.CreatedAt,
+            UpdatedAt = Department.UpdatedAt
+        };
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        if (form != null)
+        {
+            await form.Validate();
+
+            if (!success)
+            {
+                Snackbar.Add("Παρακαλώ διορθώστε τα σφάλματα στη φόρμα", Severity.Warning);
+                return;
+            }
+        }
+
+        processing = true;
+        StateHasChanged();
+
+        try
+        {
+            if (IsEdit)
+            {
+                await DepartmentService.UpdateAsync(department);
+                Snackbar.Add($"Το τμήμα '{department.Name}' ενημερώθηκε επιτυχώς", Severity.Success);
+            }
+            else
+            {
+                await DepartmentService.CreateAsync(department);
+                Snackbar.Add($"Το τμήμα '{department.Name}' δημιουργήθηκε επιτυχώς", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ArgumentException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            processing = false;
+            StateHasChanged();
+        }
+    }
+}

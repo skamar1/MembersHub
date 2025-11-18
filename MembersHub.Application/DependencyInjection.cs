@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<IMembershipTypeService, MembershipTypeService>();
+        services.AddScoped<IDepartmentService, DepartmentService>();
 
         // Add more services here as we implement them
         services.AddScoped<IExpenseService, ExpenseService>();

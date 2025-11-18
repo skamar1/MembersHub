@@ -35,11 +35,18 @@
             </MudItem>
 
             <MudItem xs="12" sm="6">
-                <MudTextField Label="Όνομα Icon (MudBlazor)"
-                              @bind-Value="category.IconName"
-                              Variant="Variant.Outlined"
-                              MaxLength="50"
-                              Placeholder="π.χ. Icons.Material.Filled.Receipt" />
+                <MudSelect T="string" Label="Icon" @bind-Value="category.IconName"
+                           Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (var icon in availableIcons)
+                    {
+                        <MudSelectItem T="string" Value="@icon.Value">
+                            <div class="d-flex align-center">
+                                <MudIcon Icon="@icon.Value" Class="mr-2" Size="Size.Small" />
+                                @icon.Name
+                            </div>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
             </MudItem>
 
             <MudItem xs="12" sm="6">
@@ -97,6 +104,35 @@
 
     private ExpenseCategory category = new();
     private bool saving = false;
+
+    private readonly List<(string Name, string Value)> availableIcons = new()
+    {
+        ("Απόδειξη", Icons.Material.Filled.Receipt),
+        ("Αγορές", Icons.Material.Filled.ShoppingCart),
+        ("Καύσιμα", Icons.Material.Filled.LocalGasStation),
+        ("Εστιατόριο", Icons.Material.Filled.Restaurant),
+        ("Υγεία", Icons.Material.Filled.LocalHospital),
+        ("Σπίτι", Icons.Material.Filled.Home),
+        ("Ηλεκτρικό", Icons.Material.Filled.ElectricBolt),
+        ("Μεταφορές", Icons.Material.Filled.DirectionsBus),
+        ("Χρήματα", Icons.Material.Filled.AttachMoney),
+        ("Τράπεζα", Icons.Material.Filled.AccountBalance),
+        ("Συντήρηση", Icons.Material.Filled.Build),
+        ("Υπολογιστής", Icons.Material.Filled.Computer),
+        ("Τηλέφωνο", Icons.Material.Filled.Phone),
+        ("Εκτύπωση", Icons.Material.Filled.Print),
+        ("Εκπαίδευση", Icons.Material.Filled.School),
+        ("Ασφάλεια", Icons.Material.Filled.Security),
+        ("Internet", Icons.Material.Filled.Wifi),
+        ("Γραφείο", Icons.Material.Filled.Business),
+        ("Αθλητισμός", Icons.Material.Filled.SportsSoccer),
+        ("Εκδήλωση", Icons.Material.Filled.Event),
+        ("Ταξίδι", Icons.Material.Filled.Flight),
+        ("Νερό", Icons.Material.Filled.Water),
+        ("Καθαριότητα", Icons.Material.Filled.CleaningServices),
+        ("Νομικά", Icons.Material.Filled.Gavel),
+        ("Άλλο", Icons.Material.Filled.Category)
+    };
 
     protected override void OnInitialized()
     {

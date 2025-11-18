@@ -44,6 +44,7 @@ public class MemberService : IMemberService
     {
         return await _context.Members
             .Include(m => m.MembershipType)
+            .Include(m => m.Department)
             .OrderBy(m => m.LastName)
             .ThenBy(m => m.FirstName)
             .ToListAsync();
@@ -53,6 +54,7 @@ public class MemberService : IMemberService
     {
         return await _context.Members
             .Include(m => m.MembershipType)
+            .Include(m => m.Department)
             .Where(m => m.Status == MemberStatus.Active)
             .OrderBy(m => m.LastName)
             .ThenBy(m => m.FirstName)
@@ -63,6 +65,7 @@ public class MemberService : IMemberService
     {
         var query = _context.Members
             .Include(m => m.MembershipType)
+            .Include(m => m.Department)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(searchTerm))

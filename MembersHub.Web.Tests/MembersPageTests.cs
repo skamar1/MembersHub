@@ -276,7 +276,7 @@ public class MembersPageTests : TestContext
                 LastName = "Παπαδόπουλος",
                 MemberNumber = "0001",
                 Phone = "6901234567",
-                Department = "Καλαθοσφαίριση",
+                DepartmentId = 1,
                 MembershipTypeId = 1,
                 MembershipType = membershipType,
                 Status = MemberStatus.Active,

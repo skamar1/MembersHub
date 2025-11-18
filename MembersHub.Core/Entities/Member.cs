@@ -17,7 +17,7 @@ public class Member
 
     // Application Information
     public string? ApplicationNumber { get; set; }
-    public string? Department { get; set; }
+    public int? DepartmentId { get; set; }
 
     // Parents Information
     public string? FatherFullName { get; set; }
@@ -53,6 +53,7 @@ public class Member
 
     // Navigation properties
     public virtual MembershipType MembershipType { get; set; } = null!;
+    public virtual Department? Department { get; set; }
     public virtual ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }
