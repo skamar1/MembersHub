@@ -24,7 +24,20 @@
             <MudProgressCircular Indeterminate="true" Size="Size.Large" />
         </div>
     }
-    else if (collector != null)
+    else if (collector == null)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            <MudText Typo="Typo.h6">Δεν υπάρχουν διαθέσιμοι εισπράκτορες</MudText>
+            <MudText Typo="Typo.body2">
+                Δεν βρέθηκαν χρήστες με ρόλο Εισπράκτορα (Treasurer) στο σύστημα.
+                Παρακαλώ προσθέστε έναν εισπράκτορα από τη σελίδα διαχείρισης χρηστών.
+            </MudText>
+            <MudButton Href="/users" Variant="Variant.Text" Color="Color.Primary" Class="mt-2">
+                Μετάβαση στους Χρήστες
+            </MudButton>
+        </MudAlert>
+    }
+    else
     {
         <!-- Header -->
         <div class="d-flex justify-space-between align-center mb-6">
