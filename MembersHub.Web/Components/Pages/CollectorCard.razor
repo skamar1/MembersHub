@@ -352,24 +352,36 @@
             return;
         }
 
-        // Check if user can select other collectors (Admin/Owner)
-        canSelectCollector = currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner;
-
-        if (canSelectCollector)
+        // Role-based access control
+        if (currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner)
         {
+            // Admin/Owner: can select any collector
+            canSelectCollector = true;
             await LoadCollectors();
-        }
 
-        // Determine which collector to show
-        if (UserId.HasValue && canSelectCollector)
+            if (UserId.HasValue)
+            {
+                // Viewing specific collector
+                collector = allCollectors.FirstOrDefault(c => c.Id == UserId.Value);
+            }
+            else if (allCollectors.Any())
+            {
+                // Default to first collector
+                collector = allCollectors.First();
+            }
+        }
+        else if (currentUser.Role == UserRole.Treasurer)
         {
-            // Admin/Owner viewing specific collector
-            collector = allCollectors.FirstOrDefault(c => c.Id == UserId.Value);
+            // Treasurer: can only see their own card
+            canSelectCollector = false;
+            collector = currentUser;
         }
         else
         {
-            // Show current user's data
-            collector = currentUser;
+            // Other roles: no access, redirect to home
+            Snackbar.Add("Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη σελίδα", Severity.Warning);
+            Navigation.NavigateTo("/");
+            return;
         }
 
         if (collector != null)
