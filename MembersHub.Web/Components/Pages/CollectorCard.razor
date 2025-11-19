@@ -27,10 +27,10 @@
     else if (collector == null)
     {
         <MudAlert Severity="Severity.Warning" Class="mb-4">
-            <MudText Typo="Typo.h6">Δεν υπάρχουν διαθέσιμοι εισπράκτορες</MudText>
+            <MudText Typo="Typo.h6">Δεν υπάρχουν διαθέσιμοι χρήστες</MudText>
             <MudText Typo="Typo.body2">
-                Δεν βρέθηκαν χρήστες με ρόλο Εισπράκτορα (Treasurer) στο σύστημα.
-                Παρακαλώ προσθέστε έναν εισπράκτορα από τη σελίδα διαχείρισης χρηστών.
+                Δεν βρέθηκαν χρήστες με ρόλο Διαχειριστή, Ιδιοκτήτη ή Εισπράκτορα στο σύστημα.
+                Παρακαλώ προσθέστε χρήστες από τη σελίδα διαχείρισης χρηστών.
             </MudText>
             <MudButton Href="/users" Variant="Variant.Text" Color="Color.Primary" Class="mt-2">
                 Μετάβαση στους Χρήστες
@@ -411,7 +411,7 @@
         {
             using var context = ContextFactory.CreateDbContext();
             allCollectors = await context.Users
-                .Where(u => u.Role == UserRole.Treasurer && u.IsActive)
+                .Where(u => (u.Role == UserRole.Admin || u.Role == UserRole.Owner || u.Role == UserRole.Treasurer) && u.IsActive)
                 .OrderBy(u => u.LastName)
                 .ThenBy(u => u.FirstName)
                 .ToListAsync();
