@@ -436,11 +436,13 @@
 
     private async Task OnCollectorChanged(User? selectedCollector)
     {
-        if (selectedCollector == null) return;
-
         collector = selectedCollector;
-        Navigation.NavigateTo($"/collector-card/{collector.Id}");
-        await LoadData();
+
+        if (selectedCollector != null)
+        {
+            Navigation.NavigateTo($"/collector-card/{collector!.Id}");
+            await LoadData();
+        }
     }
 
     private async Task OnPeriodChanged(string period)
