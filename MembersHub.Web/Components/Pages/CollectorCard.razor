@@ -65,6 +65,7 @@
                                              ToStringFunc="@(u => u?.FullName ?? "")"
                                              Label="Επιλογή Εισπράκτορα"
                                              Variant="Variant.Outlined"
+                                             Clearable="true"
                                              AdornmentIcon="@Icons.Material.Filled.Person"
                                              Style="min-width: 300px;" />
                         }
@@ -377,10 +378,10 @@
                 // Viewing specific collector
                 collector = allCollectors.FirstOrDefault(c => c.Id == UserId.Value);
             }
-            else if (allCollectors.Any())
+            else
             {
-                // Default to first collector
-                collector = allCollectors.First();
+                // Default to current user's own card
+                collector = currentUser;
             }
         }
         else if (currentUser.Role == UserRole.Treasurer)
