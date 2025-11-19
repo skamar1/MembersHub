@@ -224,8 +224,8 @@
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
 
     private bool loading = true;
-    private DateTime? startDate = new DateTime(DateTime.Now.Year, 1, 1);
-    private DateTime? endDate = DateTime.Now;
+    private DateTime? startDate = DateTime.SpecifyKind(new DateTime(DateTime.UtcNow.Year, 1, 1), DateTimeKind.Utc);
+    private DateTime? endDate = DateTime.UtcNow;
     private List<MonthColumn> monthColumns = new();
     private List<MemberSubscriptionStatusData> memberStatusData = new();
 
@@ -465,8 +465,8 @@
         if (startDate == null || endDate == null)
             return;
 
-        var current = new DateTime(startDate.Value.Year, startDate.Value.Month, 1);
-        var end = new DateTime(endDate.Value.Year, endDate.Value.Month, 1);
+        var current = DateTime.SpecifyKind(new DateTime(startDate.Value.Year, startDate.Value.Month, 1), DateTimeKind.Utc);
+        var end = DateTime.SpecifyKind(new DateTime(endDate.Value.Year, endDate.Value.Month, 1), DateTimeKind.Utc);
 
         var greekMonths = new[] { "", "ΙΑΝ", "ΦΕΒ", "ΜΑΡ", "ΑΠΡ", "ΜΑΙ", "ΙΟΥΝ", "ΙΟΥΛ", "ΑΥΓ", "ΣΕΠ", "ΟΚΤ", "ΝΟΕ", "ΔΕΚ" };
         var greekMonthsFull = new[] { "", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος",
