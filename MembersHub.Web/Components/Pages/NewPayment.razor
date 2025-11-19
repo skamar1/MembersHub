@@ -42,6 +42,8 @@
                                          Value="selectedMember"
                                          ValueChanged="OnMemberSelected"
                                          Label="Επιλογή Μέλους *"
+                                         Placeholder="Πληκτρολογήστε για αναζήτηση..."
+                                         HelperText="Πληκτρολογήστε τουλάχιστον 2 χαρακτήρες για αναζήτηση"
                                          Variant="Variant.Outlined"
                                          Required="true"
                                          RequiredError="Παρακαλώ επιλέξτε μέλος"
@@ -491,7 +493,7 @@
 
     private Payment payment = new();
     private Member? selectedMember;
-    private DateTime? paymentDate = DateTime.Today;
+    private DateTime? paymentDate = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Utc);
     private List<Subscription> outstandingSubscriptions = new();
     private List<Payment> recentPayments = new();
     private decimal memberBalance = 0;
@@ -819,7 +821,7 @@
                 };
                 selectedMember = null;
                 selectedSubscriptionId = null;
-                paymentDate = DateTime.Today;
+                paymentDate = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Utc);
                 outstandingSubscriptions.Clear();
                 memberBalance = 0;
                 await LoadRecentPayments();
