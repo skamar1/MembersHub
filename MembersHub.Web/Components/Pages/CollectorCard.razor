@@ -24,7 +24,7 @@
             <MudProgressCircular Indeterminate="true" Size="Size.Large" />
         </div>
     }
-    else if (collector == null)
+    else if (collector == null && !allCollectors.Any())
     {
         <MudAlert Severity="Severity.Warning" Class="mb-4">
             <MudText Typo="Typo.h6">Δεν υπάρχουν διαθέσιμοι χρήστες</MudText>
@@ -36,6 +36,23 @@
                 Μετάβαση στους Χρήστες
             </MudButton>
         </MudAlert>
+    }
+    else if (collector == null)
+    {
+        <div class="d-flex flex-column align-center pa-8">
+            <MudText Typo="Typo.h5" Class="mb-4">Επιλέξτε χρήστη για να δείτε την οικονομική του καρτέλα</MudText>
+            <MudAutocomplete T="User"
+                             Value="collector"
+                             ValueChanged="OnCollectorChanged"
+                             SearchFunc="SearchCollectors"
+                             ToStringFunc="@(u => u?.FullName ?? "")"
+                             Label="Επιλογή Χρήστη"
+                             Placeholder="Πληκτρολογήστε για αναζήτηση..."
+                             Variant="Variant.Outlined"
+                             Clearable="true"
+                             AdornmentIcon="@Icons.Material.Filled.Person"
+                             Style="min-width: 400px;" />
+        </div>
     }
     else
     {
