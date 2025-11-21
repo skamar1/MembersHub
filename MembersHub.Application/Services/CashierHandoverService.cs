@@ -173,11 +173,11 @@ public class CashierHandoverService : ICashierHandoverService
                        p.Status == PaymentStatus.Confirmed)
             .SumAsync(p => (decimal?)p.Amount) ?? 0;
 
-        // Calculate expenses since last handover
+        // Calculate expenses since last handover (including Pending and Approved)
         var totalExpenses = await context.Expenses
             .Where(e => e.SubmittedBy == cashierId &&
                        e.Date >= periodStart &&
-                       e.Status == ExpenseStatus.Approved)
+                       (e.Status == ExpenseStatus.Pending || e.Status == ExpenseStatus.Approved))
             .SumAsync(e => (decimal?)e.Amount) ?? 0;
 
         var netBalance = totalCollections - totalExpenses;
@@ -210,7 +210,7 @@ public class CashierHandoverService : ICashierHandoverService
             .Where(e => e.SubmittedBy == handover.CashierId &&
                        e.Date >= handover.PeriodStartDate &&
                        e.Date <= handover.PeriodEndDate &&
-                       e.Status == ExpenseStatus.Approved)
+                       (e.Status == ExpenseStatus.Pending || e.Status == ExpenseStatus.Approved))
             .OrderBy(e => e.Date)
             .ToListAsync();
 
