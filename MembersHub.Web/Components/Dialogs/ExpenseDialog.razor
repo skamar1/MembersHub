@@ -96,7 +96,7 @@
     public Expense? ExistingExpense { get; set; }
 
     private Expense expense = new();
-    private DateTime? expenseDate = DateTime.Today;
+    private DateTime? expenseDate = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Utc);
     private bool saving = false;
     private List<ExpenseCategory> categories = new();
 
