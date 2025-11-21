@@ -266,7 +266,7 @@
         {
             using var context = ContextFactory.CreateDbContext();
             allCashiers = await context.Users
-                .Where(u => u.Role == UserRole.Treasurer && u.IsActive)
+                .Where(u => (u.Role == UserRole.Treasurer || u.Role == UserRole.Admin || u.Role == UserRole.Owner) && u.IsActive)
                 .OrderBy(u => u.LastName)
                 .ThenBy(u => u.FirstName)
                 .ToListAsync();
