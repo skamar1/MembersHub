@@ -206,3 +206,4 @@
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.ApiService/obj/Debug/net9.0/rjimswa.dswa.cache.json
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.ApiService/obj/Debug/net9.0/rjsmrazor.dswa.cache.json
 /Users/arisskamagakis/1Projects/MembersHub/MembersHub.ApiService/obj/Debug/net9.0/rjsmcshtml.dswa.cache.json
+/Users/arisskamagakis/1Projects/MembersHub/MembersHub.ApiService/obj/Debug/net9.0/swae.build.ex.cache

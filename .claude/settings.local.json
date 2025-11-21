@@ -50,7 +50,12 @@
       "Bash(dotnet sln add:*)",
       "Bash(dotnet sln:*)",
       "Bash(dotnet add:*)",
-      "Bash(dotnet test:*)"
+      "Bash(dotnet test:*)",
+      "Bash(dotnet run:*)",
+      "Bash(dotnet ef migrations add:*)",
+      "Bash(dotnet ef database update:*)",
+      "Bash(pkill:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
