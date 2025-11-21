@@ -1,10 +1,13 @@
 @page "/cashier-handover"
 @using MembersHub.Core.Entities
 @using MembersHub.Core.Interfaces
+@using MembersHub.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @inject ICashierHandoverService HandoverService
 @inject ISessionService SessionService
+@inject IDbContextFactory<MembersHubContext> ContextFactory
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -13,7 +16,7 @@
 <PageTitle>Παράδοση Ταμείου - MembersHub</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-    <MudText Typo="Typo.h4" Class="mb-6">💼 Παράδοση Ταμείου</MudText>
+    <MudText Typo="Typo.h4" Class="mb-6">💼 @(canSelectCashier ? "Παραλαβή Ταμείου" : "Παράδοση Ταμείου")</MudText>
 
     @if (loading)
     {
@@ -21,17 +24,45 @@
     }
     else if (currentUser != null)
     {
+        <!-- Cashier Selection (Admin/Owner Only) -->
+        @if (canSelectCashier)
+        {
+            <MudCard Elevation="3" Class="mb-4">
+                <MudCardContent>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+                        Επιλέξτε τον ταμία από τον οποίο θα παραλάβετε το ταμείο.
+                    </MudAlert>
+                    <MudAutocomplete T="User"
+                                     Value="selectedCashier"
+                                     ValueChanged="OnCashierChanged"
+                                     SearchFunc="SearchCashiers"
+                                     ToStringFunc="@(u => u?.FullName ?? "")"
+                                     Label="Επιλογή Ταμία *"
+                                     Placeholder="Πληκτρολογήστε για αναζήτηση..."
+                                     Variant="Variant.Outlined"
+                                     Required="true"
+                                     AdornmentIcon="@Icons.Material.Filled.Person"
+                                     AdornmentColor="Color.Primary" />
+                </MudCardContent>
+            </MudCard>
+        }
+
         <!-- Current Period Summary -->
-        <MudCard Elevation="3" Class="mb-6">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">📊 Τρέχουσα Περίοδος - @currentUser.FullName</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
-                    Αυτή η σελίδα δείχνει τα δικά σας στοιχεία. Κάθε ταμείας κάνει την παράδοση του ανεξάρτητα.
-                </MudAlert>
+        @if (selectedCashier != null)
+        {
+            <MudCard Elevation="3" Class="mb-6">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">📊 Τρέχουσα Περίοδος - @selectedCashier.FullName</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (!canSelectCashier)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+                            Αυτή η σελίδα δείχνει τα δικά σας στοιχεία. Κάθε ταμείας κάνει την παράδοση του ανεξάρτητα.
+                        </MudAlert>
+                    }
                 <MudGrid>
                     <MudItem xs="12" md="3">
                         <MudPaper Class="pa-4 text-center" Elevation="0">
@@ -87,7 +118,7 @@
                     }
                     else
                     {
-                        <span>Παράδοση Ταμείου</span>
+                        <span>@(canSelectCashier ? "Παραλαβή Ταμείου" : "Παράδοση Ταμείου")</span>
                     }
                 </MudButton>
                 <MudButton Variant="Variant.Outlined"
@@ -99,6 +130,7 @@
                 </MudButton>
             </MudCardActions>
         </MudCard>
+        }
 
         <!-- Pending Handovers (Admin/Owner Only) -->
         <AuthorizeView Roles="Admin,Owner" Context="adminContext">
@@ -188,8 +220,10 @@
 
 @code {
     private User? currentUser;
+    private User? selectedCashier;
     private bool loading = true;
     private bool processing = false;
+    private bool canSelectCashier = false;
 
     private DateTime periodStart;
     private decimal totalCollections;
@@ -198,6 +232,7 @@
     private string handoverNotes = string.Empty;
 
     private List<CashierHandover> pendingHandovers = new();
+    private List<User> allCashiers = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -208,28 +243,77 @@
             return;
         }
 
-        await LoadData();
+        // Determine if user can select cashier
+        canSelectCashier = currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner;
+
+        if (canSelectCashier)
+        {
+            // Admin/Owner: load cashiers list
+            await LoadCashiers();
+        }
+        else
+        {
+            // Treasurer: use their own data
+            selectedCashier = currentUser;
+            await LoadData();
+        }
+    }
+
+    private async Task LoadCashiers()
+    {
+        try
+        {
+            using var context = ContextFactory.CreateDbContext();
+            allCashiers = await context.Users
+                .Where(u => u.Role == UserRole.Treasurer && u.IsActive)
+                .OrderBy(u => u.LastName)
+                .ThenBy(u => u.FirstName)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Σφάλμα φόρτωσης ταμιών: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task<IEnumerable<User>> SearchCashiers(string value, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return allCashiers.Take(10);
+
+        return allCashiers
+            .Where(u => u.FullName.Contains(value, StringComparison.OrdinalIgnoreCase) ||
+                       u.Username.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(10);
+    }
+
+    private async Task OnCashierChanged(User? cashier)
+    {
+        selectedCashier = cashier;
+        if (selectedCashier != null)
+        {
+            await LoadData();
+        }
     }
 
     private async Task LoadData()
     {
+        if (selectedCashier == null) return;
+
         loading = true;
         try
         {
-            if (currentUser != null)
-            {
-                // Load current period summary
-                var summary = await HandoverService.GetCashierCurrentPeriodSummaryAsync(currentUser.Id);
-                periodStart = summary.PeriodStart == DateTime.MinValue ? DateTime.Now : summary.PeriodStart;
-                totalCollections = summary.TotalCollections;
-                totalExpenses = summary.TotalExpenses;
-                netBalance = summary.NetBalance;
+            // Load current period summary for the selected cashier
+            var summary = await HandoverService.GetCashierCurrentPeriodSummaryAsync(selectedCashier.Id);
+            periodStart = summary.PeriodStart == DateTime.MinValue ? DateTime.Now : summary.PeriodStart;
+            totalCollections = summary.TotalCollections;
+            totalExpenses = summary.TotalExpenses;
+            netBalance = summary.NetBalance;
 
-                // Load pending handovers if admin/owner
-                if (currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner)
-                {
-                    pendingHandovers = await HandoverService.GetPendingHandoversAsync();
-                }
+            // Load pending handovers if admin/owner
+            if (currentUser != null && (currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner))
+            {
+                pendingHandovers = await HandoverService.GetPendingHandoversAsync();
             }
         }
         catch (Exception ex)
@@ -244,16 +328,26 @@
 
     private async Task CreateHandover()
     {
-        if (currentUser == null) return;
+        if (currentUser == null || selectedCashier == null) return;
+
+        var title = canSelectCashier ? "Επιβεβαίωση Παραλαβής" : "Επιβεβαίωση Παράδοσης";
+        var message = canSelectCashier
+            ? $"Παραλαβή Ταμείου από: {selectedCashier.FullName}\n\n" +
+              $"Θέλετε σίγουρα να παραλάβετε το ταμείο;\n\n" +
+              $"Συνολικές Εισπράξεις: €{totalCollections:N2}\n" +
+              $"Συνολικά Έξοδα: €{totalExpenses:N2}\n" +
+              $"Καθαρό Υπόλοιπο: €{netBalance:N2}\n\n" +
+              $"Μετά την παραλαβή, η τρέχουσα περίοδος του ταμία θα κλείσει."
+            : $"Παράδοση Ταμείου: {selectedCashier.FullName}\n\n" +
+              $"Θέλετε σίγουρα να κάνετε παράδοση ταμείου;\n\n" +
+              $"Συνολικές Εισπράξεις: €{totalCollections:N2}\n" +
+              $"Συνολικά Έξοδα: €{totalExpenses:N2}\n" +
+              $"Καθαρό Υπόλοιπο: €{netBalance:N2}\n\n" +
+              $"Μετά την παράδοση, η τρέχουσα περίοδός σας θα κλείσει.";
 
         var result = await DialogService.ShowMessageBox(
-            "Επιβεβαίωση Παράδοσης",
-            $"Παράδοση Ταμείου: {currentUser.FullName}\n\n" +
-            $"Θέλετε σίγουρα να κάνετε παράδοση ταμείου;\n\n" +
-            $"Συνολικές Εισπράξεις: €{totalCollections:N2}\n" +
-            $"Συνολικά Έξοδα: €{totalExpenses:N2}\n" +
-            $"Καθαρό Υπόλοιπο: €{netBalance:N2}\n\n" +
-            $"Μετά την παράδοση, η τρέχουσα περίοδος θα κλείσει.",
+            title,
+            message,
             yesText: "Επιβεβαίωση",
             cancelText: "Ακύρωση");
 
@@ -262,8 +356,13 @@
         processing = true;
         try
         {
-            var handover = await HandoverService.CreateHandoverAsync(currentUser.Id, handoverNotes);
-            Snackbar.Add("Η παράδοση ταμείου καταχωρήθηκε επιτυχώς! Αναμένει επιβεβαίωση από Διαχειριστή.", Severity.Success);
+            var handover = await HandoverService.CreateHandoverAsync(selectedCashier.Id, handoverNotes);
+
+            var successMessage = canSelectCashier
+                ? "Η παραλαβή ταμείου καταχωρήθηκε επιτυχώς!"
+                : "Η παράδοση ταμείου καταχωρήθηκε επιτυχώς! Αναμένει επιβεβαίωση από Διαχειριστή.";
+
+            Snackbar.Add(successMessage, Severity.Success);
 
             // Reset form and reload data
             handoverNotes = string.Empty;
