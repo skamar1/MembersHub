@@ -10,12 +10,17 @@ namespace MembersHub.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Remove the letter prefix (A, K, F, M) from member numbers
-            // Changes A001 -> 001, K002 -> 002, etc.
+            // Renumber all members sequentially (001, 002, 003...) based on their Id
+            // This ensures no duplicates when removing letter prefixes
             migrationBuilder.Sql(@"
-                UPDATE ""Members""
-                SET ""MemberNumber"" = SUBSTRING(""MemberNumber"" FROM 2)
-                WHERE ""MemberNumber"" ~ '^[A-Z]';
+                WITH numbered AS (
+                    SELECT ""Id"", ROW_NUMBER() OVER (ORDER BY ""Id"") as rn
+                    FROM ""Members""
+                )
+                UPDATE ""Members"" m
+                SET ""MemberNumber"" = LPAD(n.rn::text, 3, '0')
+                FROM numbered n
+                WHERE m.""Id"" = n.""Id"";
             ");
         }
 
