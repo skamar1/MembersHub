@@ -53,14 +53,25 @@
 
         <!-- Search και Filters -->
         <div class="d-flex flex-column flex-md-row gap-3 mb-4">
-            <MudTextField @bind-Value="searchString" 
+            <MudTextField @bind-Value="searchString"
                           Label="Αναζήτηση μελών..."
                           Variant="Variant.Outlined"
                           Adornment="Adornment.Start"
                           AdornmentIcon="Icons.Material.Filled.Search"
                           Class="flex-grow-1" />
-            
-            <MudSelect @bind-Value="selectedMembershipType" 
+
+            <MudSelect @bind-Value="selectedDepartmentId"
+                       Label="Τμήμα"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem Value="0">Όλα τα τμήματα</MudSelectItem>
+                @foreach (var dept in departments)
+                {
+                    <MudSelectItem Value="dept.Id">@dept.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect @bind-Value="selectedMembershipType"
                        Label="Τύπος Συνδρομής"
                        Variant="Variant.Outlined"
                        Clearable="true">
@@ -71,7 +82,7 @@
                 }
             </MudSelect>
 
-            <MudSelect @bind-Value="selectedStatus" 
+            <MudSelect @bind-Value="selectedStatus"
                        Label="Κατάσταση"
                        Variant="Variant.Outlined"
                        Clearable="true">
@@ -105,9 +116,6 @@
                     <CellTemplate>
                         @(context.Item.Department?.Name ?? "-")
                     </CellTemplate>
-                    <FilterTemplate>
-                        <MudTextField T="string" @bind-Value="departmentFilter" Placeholder="Φίλτρο..." Variant="Variant.Text" Margin="Margin.Dense" />
-                    </FilterTemplate>
                 </TemplateColumn>
                 <PropertyColumn Property="x => x.MembershipType.MonthlyFee" Title="Μηνιαία Συνδρομή" Format="C2" />
                 <TemplateColumn Title="Κατάσταση">
@@ -236,26 +244,26 @@
 @code {
     private List<Member> members = new();
     private List<MembershipType> membershipTypes = new();
+    private List<Department> departments = new();
     private bool loading = true;
-    
+
     private string searchString = "";
+    private int selectedDepartmentId = 0;
     private int selectedMembershipType = 0;
     private string? selectedStatus = null;
-    private string departmentFilter = "";
-    
+
     private int totalMembers => members.Count;
     private int activeMembers => members.Count(m => m.Status == MemberStatus.Active);
-    
+
     private IEnumerable<Member> filteredMembers => members.Where(m =>
         (string.IsNullOrWhiteSpace(searchString) ||
          m.FullName.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
          m.Phone.Contains(searchString) ||
          (m.Email?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
          m.MemberNumber.Contains(searchString, StringComparison.OrdinalIgnoreCase)) &&
+        (selectedDepartmentId == 0 || m.DepartmentId == selectedDepartmentId) &&
         (selectedMembershipType == 0 || m.MembershipTypeId == selectedMembershipType) &&
-        (selectedStatus == null || m.Status.ToString() == selectedStatus) &&
-        (string.IsNullOrWhiteSpace(departmentFilter) ||
-         (m.Department?.Name?.Contains(departmentFilter, StringComparison.OrdinalIgnoreCase) ?? false))
+        (selectedStatus == null || m.Status.ToString() == selectedStatus)
     );
     
     protected override async Task OnInitializedAsync()
@@ -282,6 +290,11 @@
             membershipTypes = await dbContext.MembershipTypes
                 .Where(mt => mt.IsActive)
                 .OrderBy(mt => mt.Name)
+                .ToListAsync();
+
+            departments = await dbContext.Departments
+                .Where(d => d.IsActive)
+                .OrderBy(d => d.Name)
                 .ToListAsync();
         }
         catch (Exception ex)
