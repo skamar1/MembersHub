@@ -209,33 +209,28 @@ public class MemberService : IMemberService
 
     private async Task<string> GenerateMemberNumberAsync(int membershipTypeId)
     {
-        var membershipType = await _context.MembershipTypes.FindAsync(membershipTypeId);
-        var prefix = membershipType?.Name switch
-        {
-            "Ενήλικες" => "A",
-            "Παιδιά" => "K",
-            "Φοιτητές" => "F",
-            _ => "M"
-        };
+        // Find the highest member number (numeric only)
+        var allMembers = await _context.Members
+            .Select(m => m.MemberNumber)
+            .ToListAsync();
 
-        // Find the last member number with this prefix
-        var lastMember = await _context.Members
-            .Where(m => m.MemberNumber.StartsWith(prefix))
-            .OrderByDescending(m => m.MemberNumber)
-            .FirstOrDefaultAsync();
-
-        int nextNumber = 1;
-        if (lastMember != null)
+        int maxNumber = 0;
+        foreach (var memberNumber in allMembers)
         {
-            // Extract the numeric part
-            var numericPart = lastMember.MemberNumber.Substring(1);
-            if (int.TryParse(numericPart, out var lastNumber))
+            // Handle both old format (A001) and new format (001)
+            var numericPart = memberNumber;
+            if (memberNumber.Length > 0 && char.IsLetter(memberNumber[0]))
             {
-                nextNumber = lastNumber + 1;
+                numericPart = memberNumber.Substring(1);
+            }
+
+            if (int.TryParse(numericPart, out var num) && num > maxNumber)
+            {
+                maxNumber = num;
             }
         }
 
-        return $"{prefix}{nextNumber:D3}"; // Format: A001, K001, F001, etc.
+        return $"{maxNumber + 1:D3}"; // Format: 001, 002, 003, etc.
     }
 
     private async Task ValidateCreateMemberAsync(Member member)
