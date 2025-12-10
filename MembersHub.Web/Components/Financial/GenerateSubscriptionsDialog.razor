@@ -13,7 +13,7 @@
                 <MudItem xs="12">
                     <MudAlert Severity="Severity.Info" Class="mb-4">
                         <MudText Typo="Typo.body1">
-                            Θα δημιουργηθούν συνδρομές για όλα τα ενεργά μέλη για τον επιλεγμένο μήνα.
+                            Θα δημιουργηθούν συνδρομές για όλους τους ενεργούς αθλητές/μέλη για τον επιλεγμένο μήνα.
                             Κάθε μέλος θα χρεωθεί με το ποσό της συνδρομής του.
                         </MudText>
                     </MudAlert>
@@ -53,7 +53,7 @@
                             <MudAlert Severity="Severity.Error">
                                 <MudText Typo="Typo.body1">
                                     <MudIcon Icon="Icons.Material.Filled.Error" Class="mr-2" />
-                                    Όλα τα ενεργά μέλη (@activeMembers.Count) έχουν ήδη συνδρομές για @GetMonthName(selectedMonth) @selectedYear.
+                                    Όλοι οι ενεργοί αθλητές/μέλη (@activeMembers.Count) έχουν ήδη συνδρομές για @GetMonthName(selectedMonth) @selectedYear.
                                 </MudText>
                                 <MudText Typo="Typo.body2" Class="mt-2">
                                     Δεν είναι δυνατή η δημιουργία νέων συνδρομών για αυτό το μήνα.
@@ -68,7 +68,7 @@
                                     Υπάρχουν ήδη @existingSubscriptionsCount συνδρομές για @GetMonthName(selectedMonth) @selectedYear.
                                 </MudText>
                                 <MudText Typo="Typo.body2" Class="mt-2">
-                                    Θα δημιουργηθούν μόνο οι συνδρομές που λείπουν (@(activeMembers.Count - existingSubscriptionsCount) μέλη).
+                                    Θα δημιουργηθούν μόνο οι συνδρομές που λείπουν (@(activeMembers.Count - existingSubscriptionsCount) αθλητές/μέλη).
                                 </MudText>
                             </MudAlert>
                         }
@@ -84,11 +84,11 @@
                         <MudText Typo="Typo.h6" Class="mb-2">
                             @if (membersToCharge > 0)
                             {
-                                <MudText>Προεπισκόπηση (@membersToCharge μέλη προς χρέωση)</MudText>
+                                <MudText>Προεπισκόπηση (@membersToCharge αθλητές/μέλη προς χρέωση)</MudText>
                             }
                             else
                             {
-                                <MudText Color="Color.Secondary">Όλα τα μέλη έχουν ήδη συνδρομές για αυτό το μήνα</MudText>
+                                <MudText Color="Color.Secondary">Όλοι οι αθλητές/μέλη έχουν ήδη συνδρομές για αυτό το μήνα</MudText>
                             }
                         </MudText>
 

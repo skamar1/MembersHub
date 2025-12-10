@@ -437,12 +437,12 @@
 
         var result = await DialogService.ShowMessageBox(
             "Αποστολή Υπενθυμίσεων",
-            $"Θα σταλούν υπενθυμίσεις σε {pendingCount} μέλη με εκκρεμείς συνδρομές και {overdueCount} με καθυστερημένες. Συνέχεια;",
+            $"Θα σταλούν υπενθυμίσεις σε {pendingCount} αθλητές/μέλη με εκκρεμείς συνδρομές και {overdueCount} με καθυστερημένες. Συνέχεια;",
             yesText: "Αποστολή", cancelText: "Ακύρωση");
 
         if (result == true)
         {
-            Snackbar.Add($"Στάλθηκαν υπενθυμίσεις σε {pendingCount + overdueCount} μέλη!", Severity.Success);
+            Snackbar.Add($"Στάλθηκαν υπενθυμίσεις σε {pendingCount + overdueCount} αθλητές/μέλη!", Severity.Success);
         }
     }
 

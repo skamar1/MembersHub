@@ -44,7 +44,7 @@
                 <MudCardContent Class="text-center">
                     <MudIcon Icon="Icons.Material.Filled.People" Color="Color.Warning" Size="Size.Large" />
                     <MudText Typo="Typo.h6" Class="mt-2">@membershipTypes.Sum(mt => mt.Members.Count)</MudText>
-                    <MudText Typo="Typo.body2">Συνολικά Μέλη</MudText>
+                    <MudText Typo="Typo.body2">Συνολικά Αθλητές/Μέλη</MudText>
                 </MudCardContent>
             </MudCard>
         </MudItem>
@@ -90,7 +90,7 @@
                             }
                         </CellTemplate>
                     </PropertyColumn>
-                    <TemplateColumn Title="Μέλη">
+                    <TemplateColumn Title="Αθλητές/Μέλη">
                         <CellTemplate>
                             <div class="d-flex align-center">
                                 <MudIcon Icon="Icons.Material.Filled.People" Size="Size.Small" Class="mr-2" />
@@ -244,7 +244,7 @@
     {
         await DialogService.ShowMessageBox(
             "Αδυναμία Διαγραφής",
-            $"Δεν μπορείτε να διαγράψετε τον τύπο συνδρομής '{membershipType.Name}' γιατί έχει αντιστοιχισμένα μέλη ({membershipType.Members.Count}).\n\nΠρώτα μεταφέρετε τα μέλη σε άλλον τύπο συνδρομής.",
+            $"Δεν μπορείτε να διαγράψετε τον τύπο συνδρομής '{membershipType.Name}' γιατί έχει αντιστοιχισμένους αθλητές/μέλη ({membershipType.Members.Count}).\n\nΠρώτα μεταφέρετε τους αθλητές/μέλη σε άλλον τύπο συνδρομής.",
             yesText: "Κατανοητό");
     }
 }
