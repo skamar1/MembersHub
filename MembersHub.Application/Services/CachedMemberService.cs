@@ -157,9 +157,9 @@ public class CachedMemberService : IMemberService
 
     public Task<IEnumerable<Member>> SearchAsync(string searchTerm) => _innerService.SearchAsync(searchTerm);
 
-    public async Task<Member> CreateAsync(Member member)
+    public async Task<Member> CreateAsync(Member member, int? createdByUserId = null)
     {
-        var result = await _innerService.CreateAsync(member);
+        var result = await _innerService.CreateAsync(member, createdByUserId);
         await InvalidateCacheAsync();
         return result;
     }

@@ -80,6 +80,11 @@ public class MembersHubContext : DbContext
                 .WithMany(d => d.Members)
                 .HasForeignKey(e => e.DepartmentId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Department configuration

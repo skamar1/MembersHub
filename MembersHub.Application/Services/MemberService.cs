@@ -45,6 +45,7 @@ public class MemberService : IMemberService
         return await _context.Members
             .Include(m => m.MembershipType)
             .Include(m => m.Department)
+            .Include(m => m.CreatedByUser)
             .OrderBy(m => m.LastName)
             .ThenBy(m => m.FirstName)
             .ToListAsync();
@@ -55,6 +56,7 @@ public class MemberService : IMemberService
         return await _context.Members
             .Include(m => m.MembershipType)
             .Include(m => m.Department)
+            .Include(m => m.CreatedByUser)
             .Where(m => m.Status == MemberStatus.Active)
             .OrderBy(m => m.LastName)
             .ThenBy(m => m.FirstName)
@@ -66,6 +68,7 @@ public class MemberService : IMemberService
         var query = _context.Members
             .Include(m => m.MembershipType)
             .Include(m => m.Department)
+            .Include(m => m.CreatedByUser)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -83,7 +86,7 @@ public class MemberService : IMemberService
         return await query.OrderBy(m => m.LastName).ThenBy(m => m.FirstName).ToListAsync();
     }
 
-    public async Task<Member> CreateAsync(Member member)
+    public async Task<Member> CreateAsync(Member member, int? createdByUserId = null)
     {
         try
         {
@@ -95,6 +98,7 @@ public class MemberService : IMemberService
             member.CreatedAt = DateTime.UtcNow;
             member.UpdatedAt = DateTime.UtcNow;
             member.Status = MemberStatus.Active;
+            member.CreatedByUserId = createdByUserId;
 
             _context.Members.Add(member);
             await _context.SaveChangesAsync();

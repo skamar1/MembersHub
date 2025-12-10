@@ -11,7 +11,7 @@ public interface IMemberService
     Task<IEnumerable<Member>> GetAllAsync();
     Task<IEnumerable<Member>> GetAllActiveAsync();
     Task<IEnumerable<Member>> SearchAsync(string searchTerm);
-    Task<Member> CreateAsync(Member member);
+    Task<Member> CreateAsync(Member member, int? createdByUserId = null);
     Task UpdateAsync(Member member);
     Task DeleteAsync(int id);
     Task<decimal> GetOutstandingBalanceAsync(int memberId);

@@ -123,6 +123,11 @@
                         @context.Item.CreatedAt.ToString("dd/MM/yyyy")
                     </CellTemplate>
                 </TemplateColumn>
+                <TemplateColumn Title="Εγγραφή από">
+                    <CellTemplate>
+                        @(context.Item.CreatedByUser?.FullName ?? "-")
+                    </CellTemplate>
+                </TemplateColumn>
                 <TemplateColumn Title="Ενέργειες" Sortable="false">
                     <CellTemplate>
                         <div class="d-flex gap-2">
@@ -270,6 +275,7 @@
             members = await dbContext.Members
                 .Include(m => m.MembershipType)
                 .Include(m => m.Department)
+                .Include(m => m.CreatedByUser)
                 .OrderBy(m => m.MemberNumber)
                 .ToListAsync();
                 

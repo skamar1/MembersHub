@@ -45,6 +45,7 @@ public class Member
     public MemberStatus Status { get; set; } = MemberStatus.Active;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public int? CreatedByUserId { get; set; }
 
     // Computed properties
     public string FullName => $"{FirstName} {LastName}";
@@ -54,6 +55,7 @@ public class Member
     // Navigation properties
     public virtual MembershipType MembershipType { get; set; } = null!;
     public virtual Department? Department { get; set; }
+    public virtual User? CreatedByUser { get; set; }
     public virtual ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

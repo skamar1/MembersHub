@@ -420,10 +420,10 @@
             {
                 // Create new member
                 var newMember = model.ToEntity();
-                await MemberService.CreateAsync(newMember);
-                
-                // Audit logging για member creation
                 var currentUser = await SessionService.GetCurrentUserAsync();
+                await MemberService.CreateAsync(newMember, currentUser?.Id);
+
+                // Audit logging για member creation
                 if (currentUser != null)
                 {
                     await AuditService.LogCreateAsync(newMember, 
