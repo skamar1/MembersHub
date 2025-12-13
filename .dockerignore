@@ -1,5 +1,5 @@
-# Git
-.git
+# Git (keep .git for fly.io remote builder)
+# .git
 .gitignore
 .gitattributes
 
