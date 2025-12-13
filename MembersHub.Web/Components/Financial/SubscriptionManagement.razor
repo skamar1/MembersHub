@@ -210,6 +210,11 @@
                             </div>
                         </CellTemplate>
                     </TemplateColumn>
+                    <TemplateColumn Title="Τμήμα">
+                        <CellTemplate>
+                            <MudText Typo="Typo.body2">@(context.Item.Member.Department?.Name ?? "-")</MudText>
+                        </CellTemplate>
+                    </TemplateColumn>
                     <PropertyColumn Property="x => x.Year" Title="Έτος" />
                     <PropertyColumn Property="x => x.Month" Title="Μήνας">
                         <CellTemplate>
@@ -353,6 +358,7 @@
             using var context = ContextFactory.CreateDbContext();
             var query = context.Subscriptions
                 .Include(s => s.Member)
+                    .ThenInclude(m => m.Department)
                 .Include(s => s.Payments)
                 .Where(s => s.Year == selectedYear);
 
