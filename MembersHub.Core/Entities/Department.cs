@@ -10,4 +10,5 @@ public class Department
 
     // Navigation properties
     public virtual ICollection<Member> Members { get; set; } = new List<Member>();
+    public virtual ICollection<UserDepartment> UserDepartments { get; set; } = new List<UserDepartment>();
 }

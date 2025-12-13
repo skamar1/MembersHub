@@ -97,15 +97,38 @@
                 @if (IsEdit)
                 {
                     <MudItem xs="12" sm="6">
-                        <MudSwitch @bind-Value="model.IsActive" 
+                        <MudSwitch @bind-Value="model.IsActive"
                                    Label="Ενεργός Χρήστης"
                                    Color="Color.Primary" />
                     </MudItem>
                     <MudItem xs="12" sm="6">
-                        <MudTextField Value="@(existingUser?.CreatedAt.ToString("dd/MM/yyyy HH:mm"))" 
-                                      Label="Ημερομηνία Δημιουργίας" 
+                        <MudTextField Value="@(existingUser?.CreatedAt.ToString("dd/MM/yyyy HH:mm"))"
+                                      Label="Ημερομηνία Δημιουργίας"
                                       ReadOnly="true"
                                       Variant="Variant.Outlined" />
+                    </MudItem>
+                }
+                @if (canAssignDepartments && model.Role == UserRole.Treasurer)
+                {
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle1" Class="mb-2">Τμήματα που μπορεί να διαχειριστεί ο Ταμίας</MudText>
+                        <MudChipSet @bind-SelectedValues="selectedDepartmentIds" SelectionMode="SelectionMode.MultiSelection" CheckMark="true" Color="Color.Primary" Variant="Variant.Outlined">
+                            @foreach (var dept in allDepartments)
+                            {
+                                <MudChip Value="@dept.Id" Text="@dept.Name" />
+                            }
+                        </MudChipSet>
+                        @if (!allDepartments.Any())
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Default">Δεν υπάρχουν διαθέσιμα τμήματα</MudText>
+                        }
+                        @if (!selectedDepartmentIds.Any())
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Warning" Class="mt-2">
+                                Αν δεν επιλεγεί κανένα τμήμα, ο ταμίας θα βλέπει όλους τους αθλητές/μέλη
+                            </MudText>
+                        }
                     </MudItem>
                 }
             </MudGrid>
@@ -142,10 +165,15 @@
     private bool success;
     private string[] errors = { };
     private bool processing = false;
-    
+
     private UserModel model = new();
     private User? existingUser;
-    
+
+    // Department assignment for treasurers
+    private List<Department> allDepartments = new();
+    private IReadOnlyCollection<object> selectedDepartmentIds = Array.Empty<object>();
+    private bool canAssignDepartments = false;
+
     // Password visibility
     private bool isPasswordVisible;
     private InputType passwordInput = InputType.Password;
@@ -159,6 +187,21 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Check if current user can assign departments (Admin or Owner)
+        var currentUser = await SessionService.GetCurrentUserAsync();
+        canAssignDepartments = currentUser != null &&
+            (currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner);
+
+        // Load all departments for assignment
+        if (canAssignDepartments)
+        {
+            using var context = ContextFactory.CreateDbContext();
+            allDepartments = await context.Departments
+                .Where(d => d.IsActive)
+                .OrderBy(d => d.Name)
+                .ToListAsync();
+        }
+
         if (IsEdit && ExistingUser != null)
         {
             existingUser = ExistingUser;
@@ -173,6 +216,17 @@
                 Role = existingUser.Role,
                 IsActive = existingUser.IsActive
             };
+
+            // Load assigned departments for this user
+            if (canAssignDepartments && existingUser.Role == UserRole.Treasurer)
+            {
+                using var context = ContextFactory.CreateDbContext();
+                var userDeptIds = await context.UserDepartments
+                    .Where(ud => ud.UserId == existingUser.Id)
+                    .Select(ud => (object)ud.DepartmentId)
+                    .ToListAsync();
+                selectedDepartmentIds = userDeptIds;
+            }
         }
         else
         {
@@ -295,6 +349,12 @@
 
                 await context.SaveChangesAsync();
 
+                // Save department assignments for Treasurers
+                if (canAssignDepartments && model.Role == UserRole.Treasurer)
+                {
+                    await SaveUserDepartmentsAsync(context, existingUser.Id);
+                }
+
                 // Audit logging για user update
                 var currentUser = await SessionService.GetCurrentUserAsync();
                 if (currentUser != null)
@@ -338,6 +398,12 @@
                 context.Users.Add(newUser);
                 await context.SaveChangesAsync();
 
+                // Save department assignments for Treasurers
+                if (canAssignDepartments && model.Role == UserRole.Treasurer)
+                {
+                    await SaveUserDepartmentsAsync(context, newUser.Id);
+                }
+
                 // Audit logging για user creation
                 var currentUser = await SessionService.GetCurrentUserAsync();
                 if (currentUser != null)
@@ -363,6 +429,28 @@
         }
     }
     
+
+    private async Task SaveUserDepartmentsAsync(MembersHubContext context, int userId)
+    {
+        // Remove existing assignments
+        var existingAssignments = await context.UserDepartments
+            .Where(ud => ud.UserId == userId)
+            .ToListAsync();
+        context.UserDepartments.RemoveRange(existingAssignments);
+
+        // Add new assignments
+        var newDeptIds = selectedDepartmentIds.Cast<int>().ToList();
+        foreach (var deptId in newDeptIds)
+        {
+            context.UserDepartments.Add(new UserDepartment
+            {
+                UserId = userId,
+                DepartmentId = deptId
+            });
+        }
+
+        await context.SaveChangesAsync();
+    }
 
     public class UserModel
     {

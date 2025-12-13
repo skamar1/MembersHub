@@ -39,6 +39,7 @@ public class MembersHubContext : DbContext
     public DbSet<FinancialReport> FinancialReports { get; set; } = null!;
     public DbSet<CashBoxDelivery> CashBoxDeliveries { get; set; } = null!;
     public DbSet<CashierHandover> CashierHandovers { get; set; } = null!;
+    public DbSet<UserDepartment> UserDepartments { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -93,6 +94,25 @@ public class MembersHubContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
             entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        // UserDepartment configuration (many-to-many join table)
+        modelBuilder.Entity<UserDepartment>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.DepartmentId });
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.UserDepartments)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Department)
+                .WithMany(d => d.UserDepartments)
+                .HasForeignKey(e => e.DepartmentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.DepartmentId);
         });
 
         // MembershipType configuration

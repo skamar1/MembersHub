@@ -252,6 +252,10 @@
     private int selectedMembershipType = 0;
     private string? selectedStatus = null;
 
+    // Τμήματα που επιτρέπεται ο τρέχων χρήστης να δει (για Treasurers)
+    private List<int> allowedDepartmentIds = new();
+    private bool isTreasurerWithDepartmentRestriction = false;
+
     private int totalMembers => members.Count;
     private int activeMembers => members.Count(m => m.Status == MemberStatus.Active);
 
@@ -274,26 +278,63 @@
     private async Task LoadData()
     {
         loading = true;
-        
+
         try
         {
             using var scope = ScopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<MembersHubContext>();
-            
-            members = await dbContext.Members
+
+            // Παίρνουμε τον τρέχοντα χρήστη για να ελέγξουμε αν είναι Treasurer με περιορισμό τμημάτων
+            var currentUser = await SessionService.GetCurrentUserAsync();
+
+            if (currentUser != null && currentUser.Role == UserRole.Treasurer)
+            {
+                // Παίρνουμε τα τμήματα που έχουν ανατεθεί στον ταμία
+                allowedDepartmentIds = await dbContext.UserDepartments
+                    .Where(ud => ud.UserId == currentUser.Id)
+                    .Select(ud => ud.DepartmentId)
+                    .ToListAsync();
+
+                // Αν υπάρχουν τμήματα, ο ταμίας έχει περιορισμό
+                isTreasurerWithDepartmentRestriction = allowedDepartmentIds.Any();
+            }
+            else
+            {
+                allowedDepartmentIds.Clear();
+                isTreasurerWithDepartmentRestriction = false;
+            }
+
+            // Query για μέλη - φιλτράρει βάσει τμημάτων αν ο χρήστης είναι Treasurer με περιορισμό
+            var membersQuery = dbContext.Members
                 .Include(m => m.MembershipType)
                 .Include(m => m.Department)
                 .Include(m => m.CreatedByUser)
+                .AsQueryable();
+
+            if (isTreasurerWithDepartmentRestriction)
+            {
+                membersQuery = membersQuery.Where(m => m.DepartmentId.HasValue && allowedDepartmentIds.Contains(m.DepartmentId.Value));
+            }
+
+            members = await membersQuery
                 .OrderBy(m => m.MemberNumber)
                 .ToListAsync();
-                
+
             membershipTypes = await dbContext.MembershipTypes
                 .Where(mt => mt.IsActive)
                 .OrderBy(mt => mt.Name)
                 .ToListAsync();
 
-            departments = await dbContext.Departments
-                .Where(d => d.IsActive)
+            // Φιλτράρουμε και τα τμήματα στο dropdown για τους Treasurers με περιορισμό
+            var departmentsQuery = dbContext.Departments
+                .Where(d => d.IsActive);
+
+            if (isTreasurerWithDepartmentRestriction)
+            {
+                departmentsQuery = departmentsQuery.Where(d => allowedDepartmentIds.Contains(d.Id));
+            }
+
+            departments = await departmentsQuery
                 .OrderBy(d => d.Name)
                 .ToListAsync();
         }
