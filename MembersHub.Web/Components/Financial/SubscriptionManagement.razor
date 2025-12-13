@@ -65,11 +65,20 @@
                     <MudSelectItem Value="@((SubscriptionStatus?)SubscriptionStatus.Overdue)">Καθυστερημένη</MudSelectItem>
                 </MudSelect>
             </MudItem>
-            <MudItem xs="12" sm="6" md="3">
+            <MudItem xs="12" sm="6" md="2">
+                <MudSelect T="int" Label="Τμήμα" @bind-Value="selectedDepartmentId">
+                    <MudSelectItem T="int" Value="0">Όλα τα τμήματα</MudSelectItem>
+                    @foreach (var dept in departments)
+                    {
+                        <MudSelectItem T="int" Value="@dept.Id">@dept.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
                 <MudTextField @bind-Value="memberSearch" Label="Αναζήτηση Μέλους"
                               Adornment="Adornment.End" AdornmentIcon="Icons.Material.Filled.Search" />
             </MudItem>
-            <MudItem xs="12" sm="6" md="3">
+            <MudItem xs="12" sm="6" md="2">
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            OnClick="LoadSubscriptions"
@@ -325,14 +334,19 @@
     private int? selectedMonth = DateTime.Now.Month;
     private SubscriptionStatus? selectedStatus;
     private string memberSearch = "";
+    private int selectedDepartmentId = 0;
 
     private List<int> availableYears = new();
     private List<Subscription> subscriptions = new();
+    private List<Department> departments = new();
+
     private IEnumerable<Subscription> filteredSubscriptions =>
-        subscriptions.Where(s => string.IsNullOrWhiteSpace(memberSearch) ||
-                                s.Member.FirstName.Contains(memberSearch, StringComparison.OrdinalIgnoreCase) ||
-                                s.Member.LastName.Contains(memberSearch, StringComparison.OrdinalIgnoreCase) ||
-                                s.Member.MemberNumber.Contains(memberSearch, StringComparison.OrdinalIgnoreCase));
+        subscriptions.Where(s =>
+            (string.IsNullOrWhiteSpace(memberSearch) ||
+             s.Member.FirstName.Contains(memberSearch, StringComparison.OrdinalIgnoreCase) ||
+             s.Member.LastName.Contains(memberSearch, StringComparison.OrdinalIgnoreCase) ||
+             s.Member.MemberNumber.Contains(memberSearch, StringComparison.OrdinalIgnoreCase)) &&
+            (selectedDepartmentId == 0 || s.Member.DepartmentId == selectedDepartmentId));
 
     protected override async Task OnInitializedAsync()
     {
@@ -343,6 +357,13 @@
         {
             availableYears.Add(year);
         }
+
+        // Φόρτωση τμημάτων για το dropdown
+        using var context = ContextFactory.CreateDbContext();
+        departments = await context.Departments
+            .Where(d => d.IsActive)
+            .OrderBy(d => d.Name)
+            .ToListAsync();
 
         await LoadSubscriptions();
     }

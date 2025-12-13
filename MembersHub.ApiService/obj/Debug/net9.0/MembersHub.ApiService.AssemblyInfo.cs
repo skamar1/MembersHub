@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MembersHub.ApiService")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c418a73a7e0fc230e341f58f551be03ceae75130")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+00c0149047982d9ac7789be2c765e92dd8655954")]
 [assembly: System.Reflection.AssemblyProductAttribute("MembersHub.ApiService")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MembersHub.ApiService")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
