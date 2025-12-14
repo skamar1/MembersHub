@@ -145,15 +145,29 @@ public class FinancialService : IFinancialService
             .ToListAsync();
     }
 
-    public async Task<FinancialSummary> GetFinancialSummaryAsync(DateTime periodStart, DateTime periodEnd)
+    public async Task<FinancialSummary> GetFinancialSummaryAsync(DateTime periodStart, DateTime periodEnd, int? collectorId = null)
     {
-        var payments = await _context.Payments
-            .Where(p => p.PaymentDate >= periodStart && p.PaymentDate <= periodEnd && p.Status == PaymentStatus.Confirmed)
-            .ToListAsync();
+        var paymentsQuery = _context.Payments
+            .Where(p => p.PaymentDate >= periodStart && p.PaymentDate <= periodEnd && p.Status == PaymentStatus.Confirmed);
 
-        var expenses = await _context.Expenses
-            .Where(e => e.Date >= periodStart && e.Date <= periodEnd && e.Status == ExpenseStatus.Approved)
-            .ToListAsync();
+        // If collectorId is provided, filter by collector (for Cashiers)
+        if (collectorId.HasValue)
+        {
+            paymentsQuery = paymentsQuery.Where(p => p.CollectorId == collectorId.Value);
+        }
+
+        var payments = await paymentsQuery.ToListAsync();
+
+        var expensesQuery = _context.Expenses
+            .Where(e => e.Date >= periodStart && e.Date <= periodEnd && e.Status == ExpenseStatus.Approved);
+
+        // If collectorId is provided, filter by submitter (for Cashiers)
+        if (collectorId.HasValue)
+        {
+            expensesQuery = expensesQuery.Where(e => e.SubmittedBy == collectorId.Value);
+        }
+
+        var expenses = await expensesQuery.ToListAsync();
 
         var totalIncome = payments.Sum(p => p.Amount);
         var totalExpenses = expenses.Sum(e => e.Amount);
@@ -172,14 +186,14 @@ public class FinancialService : IFinancialService
             OtherExpenses = 0,
             NetProfit = totalIncome - totalExpenses,
             CurrentBalance = totalIncome - totalExpenses,
-            TotalMembers = await _context.Members.CountAsync(),
+            TotalMembers = collectorId.HasValue ? 0 : await _context.Members.CountAsync(),
             PaidMembers = payments.Select(p => p.MemberId).Distinct().Count(),
             TotalPayments = payments.Count,
             GeneratedAt = DateTime.UtcNow
         };
     }
 
-    public async Task<List<MonthlyFinancialData>> GetMonthlyDataAsync(int year)
+    public async Task<List<MonthlyFinancialData>> GetMonthlyDataAsync(int year, int? collectorId = null)
     {
         var monthlyData = new List<MonthlyFinancialData>();
 
@@ -188,13 +202,27 @@ public class FinancialService : IFinancialService
             var startDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
-            var payments = await _context.Payments
-                .Where(p => p.PaymentDate >= startDate && p.PaymentDate <= endDate && p.Status == PaymentStatus.Confirmed)
-                .SumAsync(p => p.Amount);
+            var paymentsQuery = _context.Payments
+                .Where(p => p.PaymentDate >= startDate && p.PaymentDate <= endDate && p.Status == PaymentStatus.Confirmed);
 
-            var expenses = await _context.Expenses
-                .Where(e => e.Date >= startDate && e.Date <= endDate && e.Status == ExpenseStatus.Approved)
-                .SumAsync(e => e.Amount);
+            if (collectorId.HasValue)
+            {
+                paymentsQuery = paymentsQuery.Where(p => p.CollectorId == collectorId.Value);
+            }
+
+            var payments = await paymentsQuery.SumAsync(p => p.Amount);
+
+            var expensesQuery = _context.Expenses
+                .Where(e => e.Date >= startDate && e.Date <= endDate && e.Status == ExpenseStatus.Approved);
+
+            if (collectorId.HasValue)
+            {
+                expensesQuery = expensesQuery.Where(e => e.SubmittedBy == collectorId.Value);
+            }
+
+            var expenses = await expensesQuery.SumAsync(e => e.Amount);
+
+            var paymentCount = await paymentsQuery.CountAsync();
 
             monthlyData.Add(new MonthlyFinancialData
             {
@@ -203,15 +231,13 @@ public class FinancialService : IFinancialService
                 Income = payments,
                 Expenses = expenses,
                 NetProfit = payments - expenses,
-                NewMembers = await _context.Members
+                NewMembers = collectorId.HasValue ? 0 : await _context.Members
                     .Where(m => m.CreatedAt >= startDate && m.CreatedAt <= endDate)
                     .CountAsync(),
-                TotalMembers = await _context.Members
+                TotalMembers = collectorId.HasValue ? 0 : await _context.Members
                     .Where(m => m.CreatedAt <= endDate && m.Status == MemberStatus.Active)
                     .CountAsync(),
-                AveragePayment = payments > 0 ? payments / Math.Max(1, await _context.Payments
-                    .Where(p => p.PaymentDate >= startDate && p.PaymentDate <= endDate && p.Status == PaymentStatus.Confirmed)
-                    .CountAsync()) : 0
+                AveragePayment = payments > 0 ? payments / Math.Max(1, paymentCount) : 0
             });
         }
 
@@ -641,10 +667,17 @@ public class FinancialService : IFinancialService
             .AverageAsync(p => p.Amount);
     }
 
-    public async Task<List<(string PaymentMethod, int Count, decimal Total)>> GetPaymentMethodStatsAsync(DateTime startDate, DateTime endDate)
+    public async Task<List<(string PaymentMethod, int Count, decimal Total)>> GetPaymentMethodStatsAsync(DateTime startDate, DateTime endDate, int? collectorId = null)
     {
-        return await _context.Payments
-            .Where(p => p.PaymentDate >= startDate && p.PaymentDate <= endDate && p.Status == PaymentStatus.Confirmed)
+        var query = _context.Payments
+            .Where(p => p.PaymentDate >= startDate && p.PaymentDate <= endDate && p.Status == PaymentStatus.Confirmed);
+
+        if (collectorId.HasValue)
+        {
+            query = query.Where(p => p.CollectorId == collectorId.Value);
+        }
+
+        return await query
             .GroupBy(p => p.PaymentMethod)
             .Select(g => new ValueTuple<string, int, decimal>(
                 g.Key.ToString(),

@@ -43,8 +43,8 @@ public interface IFinancialService
     Task<PaymentInstallment> ProcessInstallmentPaymentAsync(int installmentId, Payment payment);
     
     // Financial Reporting
-    Task<FinancialSummary> GetFinancialSummaryAsync(DateTime periodStart, DateTime periodEnd);
-    Task<List<MonthlyFinancialData>> GetMonthlyDataAsync(int year);
+    Task<FinancialSummary> GetFinancialSummaryAsync(DateTime periodStart, DateTime periodEnd, int? collectorId = null);
+    Task<List<MonthlyFinancialData>> GetMonthlyDataAsync(int year, int? collectorId = null);
     Task<List<MonthlyFinancialData>> GetYearlyTrendsAsync(int years = 5);
     Task<Dictionary<string, decimal>> GetIncomeBySourceAsync(DateTime startDate, DateTime endDate);
     Task<Dictionary<string, decimal>> GetExpensesByCategoryAsync(DateTime startDate, DateTime endDate);
@@ -62,5 +62,5 @@ public interface IFinancialService
     Task<int> GetTotalPaidMembersAsync(int year, int month = 0);
     Task<int> GetTotalOverdueMembersAsync();
     Task<decimal> GetAveragePaymentAmountAsync(DateTime startDate, DateTime endDate);
-    Task<List<(string PaymentMethod, int Count, decimal Total)>> GetPaymentMethodStatsAsync(DateTime startDate, DateTime endDate);
+    Task<List<(string PaymentMethod, int Count, decimal Total)>> GetPaymentMethodStatsAsync(DateTime startDate, DateTime endDate, int? collectorId = null);
 }

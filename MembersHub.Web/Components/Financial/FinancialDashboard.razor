@@ -2,16 +2,25 @@
 @using MembersHub.Core.Entities
 @using MembersHub.Core.Interfaces
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using MembersHub.Application.Services
+@using System.Security.Claims
 @inject IFinancialService FinancialService
 @inject ISnackbar Snackbar
 @inject TimeZoneService TimeZone
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
 
 <PageTitle>Financial Dashboard</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-    <MudText Typo="Typo.h4" Class="mb-6">💰 Financial Dashboard</MudText>
+    <MudText Typo="Typo.h4" Class="mb-6">
+        💰 Financial Dashboard
+        @if (isCashierView)
+        {
+            <MudChip T="string" Color="Color.Info" Size="Size.Small" Class="ml-2">Τα στοιχεία μου</MudChip>
+        }
+    </MudText>
 
     <!-- Period Selection -->
     <MudPaper Class="pa-4 mb-6" Elevation="2">
@@ -292,8 +301,31 @@
     private List<MonthlyFinancialData> monthlyData = new();
     private List<(string PaymentMethod, int Count, decimal Total)> paymentMethodStats = new();
 
+    // User role state
+    private int? currentUserId;
+    private bool isCashierView = false;
+
     protected override async Task OnInitializedAsync()
     {
+        // Check user role and determine if we should filter by collector
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        var isAdminOrOwner = user.IsInRole("Admin") || user.IsInRole("Owner");
+
+        if (!isAdminOrOwner && user.IsInRole("Treasurer"))
+        {
+            // Cashier (Treasurer) - filter by their user ID
+            isCashierView = true;
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                           ?? user.FindFirst("sub")?.Value
+                           ?? user.FindFirst("UserId")?.Value;
+            if (int.TryParse(userIdClaim, out int userId))
+            {
+                currentUserId = userId;
+            }
+        }
+
         SetCurrentMonth();
         await LoadDashboardData();
     }
@@ -351,14 +383,14 @@
         loading = true;
         try
         {
-            // Load financial summary
-            summary = await FinancialService.GetFinancialSummaryAsync(startDate.Value, endDate.Value);
+            // Load financial summary (pass currentUserId for cashier filtering)
+            summary = await FinancialService.GetFinancialSummaryAsync(startDate.Value, endDate.Value, currentUserId);
 
             // Load monthly data for charts
-            monthlyData = await FinancialService.GetMonthlyDataAsync(startDate.Value.Year);
+            monthlyData = await FinancialService.GetMonthlyDataAsync(startDate.Value.Year, currentUserId);
 
             // Load payment method statistics
-            paymentMethodStats = await FinancialService.GetPaymentMethodStatsAsync(startDate.Value, endDate.Value);
+            paymentMethodStats = await FinancialService.GetPaymentMethodStatsAsync(startDate.Value, endDate.Value, currentUserId);
         }
         catch (Exception ex)
         {
