@@ -16,4 +16,11 @@ public interface IExpenseCategoryService
     Task<List<ExpenseCategory>> GetActiveCategoriesAsync();
     Task<bool> DeleteCategoryAsync(int categoryId);
     Task<bool> ToggleCategoryStatusAsync(int categoryId);
+
+    // Subcategory methods
+    Task<List<ExpenseCategory>> GetParentCategoriesAsync();
+    Task<List<ExpenseCategory>> GetActiveParentCategoriesAsync();
+    Task<List<ExpenseCategory>> GetSubCategoriesAsync(int parentCategoryId);
+    Task<List<ExpenseCategory>> GetActiveSubCategoriesAsync(int parentCategoryId);
+    Task<List<ExpenseCategory>> GetCategoriesWithSubCategoriesAsync();
 }

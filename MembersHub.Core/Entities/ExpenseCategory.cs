@@ -17,6 +17,11 @@ public class ExpenseCategory
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
+    // Self-referencing for parent-child hierarchy (subcategories)
+    public int? ParentCategoryId { get; set; }
+    public virtual ExpenseCategory? ParentCategory { get; set; }
+    public virtual ICollection<ExpenseCategory> SubCategories { get; set; } = new List<ExpenseCategory>();
+
     // Navigation properties
     public virtual ICollection<Expense> Expenses { get; set; } = new List<Expense>();
 }

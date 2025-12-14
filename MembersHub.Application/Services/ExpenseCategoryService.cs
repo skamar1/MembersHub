@@ -68,6 +68,7 @@ public class ExpenseCategoryService : IExpenseCategoryService
             existing.IconName = category.IconName;
             existing.ColorCode = category.ColorCode;
             existing.DisplayOrder = category.DisplayOrder;
+            existing.ParentCategoryId = category.ParentCategoryId;
             existing.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -127,6 +128,17 @@ public class ExpenseCategoryService : IExpenseCategoryService
                     "Μπορείτε να την απενεργοποιήσετε αντί για διαγραφή.");
             }
 
+            // Check if category has subcategories
+            var subCategoryCount = await _context.ExpenseCategories
+                .CountAsync(c => c.ParentCategoryId == categoryId);
+
+            if (subCategoryCount > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Δεν μπορεί να διαγραφεί η κατηγορία '{category.Name}' επειδή έχει {subCategoryCount} υποκατηγορίες. " +
+                    "Διαγράψτε πρώτα τις υποκατηγορίες ή μετακινήστε τις.");
+            }
+
             _context.ExpenseCategories.Remove(category);
             await _context.SaveChangesAsync();
 
@@ -184,5 +196,53 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
         if (errors.Any())
             throw new ArgumentException(string.Join(", ", errors));
+    }
+
+    // Subcategory methods
+
+    public async Task<List<ExpenseCategory>> GetParentCategoriesAsync()
+    {
+        return await _context.ExpenseCategories
+            .Where(c => c.ParentCategoryId == null)
+            .OrderBy(c => c.DisplayOrder)
+            .ThenBy(c => c.Name)
+            .ToListAsync();
+    }
+
+    public async Task<List<ExpenseCategory>> GetActiveParentCategoriesAsync()
+    {
+        return await _context.ExpenseCategories
+            .Where(c => c.ParentCategoryId == null && c.IsActive)
+            .OrderBy(c => c.DisplayOrder)
+            .ThenBy(c => c.Name)
+            .ToListAsync();
+    }
+
+    public async Task<List<ExpenseCategory>> GetSubCategoriesAsync(int parentCategoryId)
+    {
+        return await _context.ExpenseCategories
+            .Where(c => c.ParentCategoryId == parentCategoryId)
+            .OrderBy(c => c.DisplayOrder)
+            .ThenBy(c => c.Name)
+            .ToListAsync();
+    }
+
+    public async Task<List<ExpenseCategory>> GetActiveSubCategoriesAsync(int parentCategoryId)
+    {
+        return await _context.ExpenseCategories
+            .Where(c => c.ParentCategoryId == parentCategoryId && c.IsActive)
+            .OrderBy(c => c.DisplayOrder)
+            .ThenBy(c => c.Name)
+            .ToListAsync();
+    }
+
+    public async Task<List<ExpenseCategory>> GetCategoriesWithSubCategoriesAsync()
+    {
+        return await _context.ExpenseCategories
+            .Include(c => c.SubCategories.OrderBy(s => s.DisplayOrder).ThenBy(s => s.Name))
+            .Where(c => c.ParentCategoryId == null)
+            .OrderBy(c => c.DisplayOrder)
+            .ThenBy(c => c.Name)
+            .ToListAsync();
     }
 }

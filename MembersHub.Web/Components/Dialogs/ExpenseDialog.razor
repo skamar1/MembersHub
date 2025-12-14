@@ -38,16 +38,50 @@
                                  Format="N2" />
             </MudItem>
 
-            <MudItem xs="12">
-                <MudSelect T="int"
-                           @bind-Value="expense.ExpenseCategoryId"
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int?"
+                           Value="selectedParentCategoryId"
+                           ValueChanged="OnParentCategoryChanged"
                            Label="Κατηγορία *"
                            Variant="Variant.Outlined"
                            Required="true">
-                    @foreach (var category in categories)
+                    <MudSelectItem T="int?" Value="@((int?)null)">-- Επιλέξτε Κατηγορία --</MudSelectItem>
+                    @foreach (var category in parentCategories)
                     {
-                        <MudSelectItem T="int" Value="@category.Id">
-                            @category.Name
+                        <MudSelectItem T="int?" Value="@category.Id">
+                            <div class="d-flex align-center gap-2">
+                                @if (!string.IsNullOrEmpty(category.IconName))
+                                {
+                                    <MudIcon Icon="@category.IconName" Size="Size.Small"
+                                             Style="@($"color: {(category.ColorCode ?? "#666")}")" />
+                                }
+                                @category.Name
+                            </div>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int?"
+                           @bind-Value="selectedSubCategoryId"
+                           Label="Υποκατηγορία"
+                           Variant="Variant.Outlined"
+                           Disabled="@(!subCategories.Any())">
+                    <MudSelectItem T="int?" Value="@((int?)null)">
+                        @(subCategories.Any() ? "-- Χωρίς Υποκατηγορία --" : "-- Δεν υπάρχουν υποκατηγορίες --")
+                    </MudSelectItem>
+                    @foreach (var subCategory in subCategories)
+                    {
+                        <MudSelectItem T="int?" Value="@subCategory.Id">
+                            <div class="d-flex align-center gap-2">
+                                @if (!string.IsNullOrEmpty(subCategory.IconName))
+                                {
+                                    <MudIcon Icon="@subCategory.IconName" Size="Size.Small"
+                                             Style="@($"color: {(subCategory.ColorCode ?? "#666")}")" />
+                                }
+                                @subCategory.Name
+                            </div>
                         </MudSelectItem>
                     }
                 </MudSelect>
@@ -98,11 +132,14 @@
     private Expense expense = new();
     private DateTime? expenseDate = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Utc);
     private bool saving = false;
-    private List<ExpenseCategory> categories = new();
+    private List<ExpenseCategory> parentCategories = new();
+    private List<ExpenseCategory> subCategories = new();
+    private int? selectedParentCategoryId;
+    private int? selectedSubCategoryId;
 
     protected override async Task OnInitializedAsync()
     {
-        categories = await ExpenseCategoryService.GetActiveCategoriesAsync();
+        parentCategories = await ExpenseCategoryService.GetActiveParentCategoriesAsync();
 
         if (ExistingExpense != null)
         {
@@ -117,6 +154,47 @@
                 SubmittedBy = ExistingExpense.SubmittedBy
             };
             expenseDate = ExistingExpense.Date;
+
+            // Determine if existing expense is linked to parent or subcategory
+            await LoadExistingCategorySelection();
+        }
+    }
+
+    private async Task LoadExistingCategorySelection()
+    {
+        if (ExistingExpense == null) return;
+
+        var category = await ExpenseCategoryService.GetCategoryByIdAsync(ExistingExpense.ExpenseCategoryId);
+        if (category == null) return;
+
+        if (category.ParentCategoryId.HasValue)
+        {
+            // Expense is linked to a subcategory
+            selectedParentCategoryId = category.ParentCategoryId.Value;
+            selectedSubCategoryId = category.Id;
+            subCategories = await ExpenseCategoryService.GetActiveSubCategoriesAsync(category.ParentCategoryId.Value);
+        }
+        else
+        {
+            // Expense is linked to a parent category
+            selectedParentCategoryId = category.Id;
+            selectedSubCategoryId = null;
+            subCategories = await ExpenseCategoryService.GetActiveSubCategoriesAsync(category.Id);
+        }
+    }
+
+    private async Task OnParentCategoryChanged(int? newParentId)
+    {
+        selectedParentCategoryId = newParentId;
+        selectedSubCategoryId = null;
+
+        if (newParentId.HasValue)
+        {
+            subCategories = await ExpenseCategoryService.GetActiveSubCategoriesAsync(newParentId.Value);
+        }
+        else
+        {
+            subCategories = new List<ExpenseCategory>();
         }
     }
 
@@ -134,6 +212,12 @@
             return;
         }
 
+        if (!selectedParentCategoryId.HasValue)
+        {
+            Snackbar.Add("Παρακαλώ επιλέξτε κατηγορία", Severity.Error);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(expense.Description))
         {
             Snackbar.Add("Παρακαλώ συμπληρώστε την περιγραφή", Severity.Error);
@@ -144,6 +228,9 @@
         try
         {
             expense.Date = expenseDate.Value;
+
+            // Set ExpenseCategoryId: use subcategory if selected, otherwise use parent category
+            expense.ExpenseCategoryId = selectedSubCategoryId ?? selectedParentCategoryId.Value;
 
             if (ExistingExpense != null)
             {

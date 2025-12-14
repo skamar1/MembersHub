@@ -55,15 +55,31 @@
                           AdornmentIcon="@Icons.Material.Filled.Search"
                           Class="flex-grow-1" />
 
-            <MudSelect @bind-Value="selectedCategoryId"
+            <MudSelect T="int?"
+                       Value="filterParentCategoryId"
+                       ValueChanged="OnFilterParentCategoryChanged"
                        Label="Κατηγορία"
                        Variant="Variant.Outlined"
                        Clearable="true">
                 <MudSelectItem T="int?" Value="@((int?)null)">Όλες</MudSelectItem>
-                @foreach (var category in categories)
+                @foreach (var category in parentCategories)
                 {
                     <MudSelectItem T="int?" Value="@category.Id">
                         @category.Name
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSelect @bind-Value="filterSubCategoryId"
+                       Label="Υποκατηγορία"
+                       Variant="Variant.Outlined"
+                       Clearable="true"
+                       Disabled="@(!filterSubCategories.Any())">
+                <MudSelectItem T="int?" Value="@((int?)null)">Όλες</MudSelectItem>
+                @foreach (var subCategory in filterSubCategories)
+                {
+                    <MudSelectItem T="int?" Value="@subCategory.Id">
+                        @subCategory.Name
                     </MudSelectItem>
                 }
             </MudSelect>
@@ -94,7 +110,26 @@
                     <PropertyColumn Property="x => x.Date" Title="Ημερομηνία" Format="dd/MM/yyyy" />
                     <TemplateColumn Title="Κατηγορία">
                         <CellTemplate>
-                            @(context.Item.Category?.Name ?? "Δεν καθορίστηκε")
+                            @{
+                                var cat = context.Item.Category;
+                                if (cat != null)
+                                {
+                                    if (cat.ParentCategoryId.HasValue)
+                                    {
+                                        // It's a subcategory - show parent → subcategory
+                                        <span>@(cat.ParentCategory?.Name ?? "?") → @cat.Name</span>
+                                    }
+                                    else
+                                    {
+                                        // It's a parent category
+                                        <span>@cat.Name</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span>Δεν καθορίστηκε</span>
+                                }
+                            }
                         </CellTemplate>
                     </TemplateColumn>
                     <PropertyColumn Property="x => x.Amount" Title="Ποσό" Format="C2" />
@@ -169,7 +204,7 @@
                                     <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" /> @expense.Date.ToString("dd/MM/yyyy")
                                 </MudText>
                                 <MudText Typo="Typo.body2" Class="mb-1">
-                                    <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" /> @(expense.Category?.Name ?? "Δεν καθορίστηκε")
+                                    <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" /> @GetCategoryDisplayName(expense)
                                 </MudText>
                                 <MudText Typo="Typo.body2" Class="mb-1" Color="Color.Primary">
                                     <MudIcon Icon="@Icons.Material.Filled.Euro" Size="Size.Small" /> €@expense.Amount.ToString("N2")
@@ -228,12 +263,14 @@
 
 @code {
     private List<Expense> expenses = new();
-    private List<ExpenseCategory> categories = new();
+    private List<ExpenseCategory> parentCategories = new();
+    private List<ExpenseCategory> filterSubCategories = new();
     private bool loading = true;
     private User? currentUser;
 
     private string searchString = "";
-    private int? selectedCategoryId = null;
+    private int? filterParentCategoryId = null;
+    private int? filterSubCategoryId = null;
     private ExpenseStatus? selectedStatus = null;
 
     private int pendingCount => expenses.Count(e => e.Status == ExpenseStatus.Pending);
@@ -245,15 +282,69 @@
          e.ExpenseNumber.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
          e.Description.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
          (e.Vendor?.Contains(searchString, StringComparison.OrdinalIgnoreCase) ?? false)) &&
-        (selectedCategoryId == null || e.ExpenseCategoryId == selectedCategoryId) &&
+        FilterByCategory(e) &&
         (selectedStatus == null || e.Status == selectedStatus)
     ).OrderByDescending(e => e.Date);
+
+    private bool FilterByCategory(Expense expense)
+    {
+        // No filter selected
+        if (filterParentCategoryId == null) return true;
+
+        var cat = expense.Category;
+        if (cat == null) return false;
+
+        // If subcategory filter is selected, match exactly
+        if (filterSubCategoryId.HasValue)
+        {
+            return expense.ExpenseCategoryId == filterSubCategoryId.Value;
+        }
+
+        // If only parent category filter is selected, match parent OR any of its subcategories
+        if (cat.ParentCategoryId.HasValue)
+        {
+            // Expense is linked to a subcategory - check if its parent matches
+            return cat.ParentCategoryId == filterParentCategoryId;
+        }
+        else
+        {
+            // Expense is linked to a parent category directly
+            return expense.ExpenseCategoryId == filterParentCategoryId;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
         currentUser = await SessionService.GetCurrentUserAsync();
-        categories = await ExpenseCategoryService.GetAllCategoriesAsync();
+        parentCategories = await ExpenseCategoryService.GetParentCategoriesAsync();
         await LoadData();
+    }
+
+    private async Task OnFilterParentCategoryChanged(int? newParentId)
+    {
+        filterParentCategoryId = newParentId;
+        filterSubCategoryId = null;
+
+        if (newParentId.HasValue)
+        {
+            filterSubCategories = await ExpenseCategoryService.GetSubCategoriesAsync(newParentId.Value);
+        }
+        else
+        {
+            filterSubCategories = new List<ExpenseCategory>();
+        }
+    }
+
+    private string GetCategoryDisplayName(Expense expense)
+    {
+        var cat = expense.Category;
+        if (cat == null) return "Δεν καθορίστηκε";
+
+        if (cat.ParentCategoryId.HasValue)
+        {
+            return $"{cat.ParentCategory?.Name ?? "?"} → {cat.Name}";
+        }
+        return cat.Name;
     }
 
     private async Task LoadData()

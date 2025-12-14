@@ -175,9 +175,16 @@ public class MembersHubContext : DbContext
             entity.Property(e => e.IconName).HasMaxLength(1000);
             entity.Property(e => e.ColorCode).HasMaxLength(7); // #RRGGBB
 
+            // Self-referencing relationship for subcategories
+            entity.HasOne(e => e.ParentCategory)
+                .WithMany(e => e.SubCategories)
+                .HasForeignKey(e => e.ParentCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             entity.HasIndex(e => e.Name).IsUnique();
             entity.HasIndex(e => e.IsActive);
             entity.HasIndex(e => e.DisplayOrder);
+            entity.HasIndex(e => e.ParentCategoryId);
         });
 
         // Expense configuration

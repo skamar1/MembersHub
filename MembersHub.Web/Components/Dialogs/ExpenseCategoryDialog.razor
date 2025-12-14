@@ -11,13 +11,34 @@
                 @if (ExistingCategory != null)
                 {
                     <MudAlert Severity="Severity.Info">
-                        Επεξεργασία Κατηγορίας: @ExistingCategory.Name
+                        Επεξεργασία @(ExistingCategory.ParentCategoryId.HasValue ? "Υποκατηγορίας" : "Κατηγορίας"): @ExistingCategory.Name
+                    </MudAlert>
+                }
+                else if (ParentCategory != null)
+                {
+                    <MudAlert Severity="Severity.Info">
+                        Δημιουργία Υποκατηγορίας για: @ParentCategory.Name
                     </MudAlert>
                 }
             </MudItem>
 
+            @if (ExistingCategory == null && ParentCategory == null)
+            {
+                <MudItem xs="12">
+                    <MudSelect T="int?" Label="Γονική Κατηγορία" @bind-Value="category.ParentCategoryId"
+                               Variant="Variant.Outlined"
+                               HelperText="Αφήστε κενό για δημιουργία κύριας κατηγορίας">
+                        <MudSelectItem T="int?" Value="@((int?)null)">-- Καμία (Κύρια Κατηγορία) --</MudSelectItem>
+                        @foreach (var parent in parentCategories)
+                        {
+                            <MudSelectItem T="int?" Value="@parent.Id">@parent.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            }
+
             <MudItem xs="12">
-                <MudTextField Label="Όνομα Κατηγορίας *"
+                <MudTextField Label="@(ParentCategory != null || category.ParentCategoryId.HasValue ? "Όνομα Υποκατηγορίας *" : "Όνομα Κατηγορίας *")"
                               @bind-Value="category.Name"
                               Required="true"
                               Variant="Variant.Outlined"
@@ -102,7 +123,11 @@
     [Parameter]
     public ExpenseCategory? ExistingCategory { get; set; }
 
+    [Parameter]
+    public ExpenseCategory? ParentCategory { get; set; }
+
     private ExpenseCategory category = new();
+    private List<ExpenseCategory> parentCategories = new();
     private bool saving = false;
 
     private readonly List<(string Name, string Value)> availableIcons = new()
@@ -134,8 +159,11 @@
         ("Άλλο", Icons.Material.Filled.Category)
     };
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        // Load parent categories for dropdown
+        parentCategories = await ExpenseCategoryService.GetParentCategoriesAsync();
+
         if (ExistingCategory != null)
         {
             category = new ExpenseCategory
@@ -146,8 +174,15 @@
                 IconName = ExistingCategory.IconName,
                 ColorCode = ExistingCategory.ColorCode,
                 DisplayOrder = ExistingCategory.DisplayOrder,
-                IsActive = ExistingCategory.IsActive
+                IsActive = ExistingCategory.IsActive,
+                ParentCategoryId = ExistingCategory.ParentCategoryId
             };
+        }
+        else if (ParentCategory != null)
+        {
+            // Creating a subcategory
+            category.ParentCategoryId = ParentCategory.Id;
+            category.IsActive = true;
         }
         else
         {
@@ -170,14 +205,16 @@
             {
                 // Update existing category
                 var updated = await ExpenseCategoryService.UpdateCategoryAsync(category);
-                Snackbar.Add($"Η κατηγορία '{updated.Name}' ενημερώθηκε επιτυχώς", Severity.Success);
+                var label = updated.ParentCategoryId.HasValue ? "υποκατηγορία" : "κατηγορία";
+                Snackbar.Add($"Η {label} '{updated.Name}' ενημερώθηκε επιτυχώς", Severity.Success);
                 MudDialog.Close(DialogResult.Ok(updated));
             }
             else
             {
                 // Create new category
                 var created = await ExpenseCategoryService.CreateCategoryAsync(category);
-                Snackbar.Add($"Η κατηγορία '{created.Name}' δημιουργήθηκε επιτυχώς", Severity.Success);
+                var label = created.ParentCategoryId.HasValue ? "υποκατηγορία" : "κατηγορία";
+                Snackbar.Add($"Η {label} '{created.Name}' δημιουργήθηκε επιτυχώς", Severity.Success);
                 MudDialog.Close(DialogResult.Ok(created));
             }
         }

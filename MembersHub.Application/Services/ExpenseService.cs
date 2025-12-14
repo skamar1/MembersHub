@@ -103,6 +103,7 @@ public class ExpenseService : IExpenseService
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
             .Include(e => e.Category)
+                .ThenInclude(c => c!.ParentCategory)
             .FirstOrDefaultAsync(e => e.Id == expenseId);
     }
 
@@ -112,6 +113,7 @@ public class ExpenseService : IExpenseService
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
             .Include(e => e.Category)
+                .ThenInclude(c => c!.ParentCategory)
             .Where(e => e.SubmittedBy == userId)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
@@ -123,6 +125,7 @@ public class ExpenseService : IExpenseService
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
             .Include(e => e.Category)
+                .ThenInclude(c => c!.ParentCategory)
             .Where(e => e.Status == status)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
@@ -134,6 +137,7 @@ public class ExpenseService : IExpenseService
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
             .Include(e => e.Category)
+                .ThenInclude(c => c!.ParentCategory)
             .Where(e => e.ExpenseCategoryId == categoryId)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
@@ -145,6 +149,7 @@ public class ExpenseService : IExpenseService
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
             .Include(e => e.Category)
+                .ThenInclude(c => c!.ParentCategory)
             .Where(e => e.Date >= startDate && e.Date <= endDate)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
@@ -372,6 +377,7 @@ public class ExpenseService : IExpenseService
             .Include(e => e.Submitter)
             .Include(e => e.Approver)
             .Include(e => e.Category)
+                .ThenInclude(c => c!.ParentCategory)
             .Where(e => e.Status == ExpenseStatus.Approved && !e.IsReimbursed)
             .OrderByDescending(e => e.ApprovedAt)
             .ToListAsync();
@@ -388,6 +394,7 @@ public class ExpenseService : IExpenseService
     {
         return await _context.Expenses
             .Include(e => e.Category)
+                .ThenInclude(c => c!.ParentCategory)
             .Where(e => e.Date >= startDate && e.Date <= endDate && e.Status == ExpenseStatus.Approved)
             .GroupBy(e => e.Category.Name)
             .ToDictionaryAsync(g => g.Key, g => g.Sum(e => e.Amount));
@@ -587,6 +594,7 @@ public class ExpenseService : IExpenseService
     {
         return await _context.Expenses
             .Include(e => e.Category)
+                .ThenInclude(c => c!.ParentCategory)
             .Where(e => e.Date >= startDate && e.Date <= endDate && e.Status == ExpenseStatus.Approved)
             .GroupBy(e => new { e.Category.Id, e.Category.Name })
             .Select(g => new ValueTuple<int, string, decimal, int>(
