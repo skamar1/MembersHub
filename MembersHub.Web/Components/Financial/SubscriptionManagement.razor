@@ -12,6 +12,7 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject IEmailNotificationService EmailService
+@inject ISessionService SessionService
 @attribute [Authorize(Roles = "Admin,Owner,Treasurer")]
 
 <PageTitle>Subscription Management</PageTitle>
@@ -339,6 +340,8 @@
     private List<int> availableYears = new();
     private List<Subscription> subscriptions = new();
     private List<Department> departments = new();
+    private List<int> allowedDepartmentIds = new();
+    private bool shouldFilterByDepartment = false;
 
     private IEnumerable<Subscription> filteredSubscriptions =>
         subscriptions.Where(s =>
@@ -358,12 +361,40 @@
             availableYears.Add(year);
         }
 
+        // Check user role - only Admin/Owner see everything
+        var currentUser = await SessionService.GetCurrentUserAsync();
+        bool isAdminOrOwner = currentUser != null &&
+            (currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner);
+        shouldFilterByDepartment = currentUser != null && !isAdminOrOwner;
+
         // Φόρτωση τμημάτων για το dropdown
         using var context = ContextFactory.CreateDbContext();
-        departments = await context.Departments
-            .Where(d => d.IsActive)
-            .OrderBy(d => d.Name)
-            .ToListAsync();
+
+        // Load allowed departments for non-Admin/Owner users
+        if (shouldFilterByDepartment)
+        {
+            allowedDepartmentIds = await context.UserDepartments
+                .Where(ud => ud.UserId == currentUser!.Id)
+                .Select(ud => ud.DepartmentId)
+                .ToListAsync();
+        }
+
+        // Filter departments dropdown for non-Admin/Owner users
+        var departmentsQuery = context.Departments.Where(d => d.IsActive);
+
+        if (shouldFilterByDepartment)
+        {
+            if (allowedDepartmentIds.Any())
+            {
+                departmentsQuery = departmentsQuery.Where(d => allowedDepartmentIds.Contains(d.Id));
+            }
+            else
+            {
+                departmentsQuery = departmentsQuery.Where(d => false); // No departments = empty list
+            }
+        }
+
+        departments = await departmentsQuery.OrderBy(d => d.Name).ToListAsync();
 
         await LoadSubscriptions();
     }
@@ -382,6 +413,13 @@
                     .ThenInclude(m => m.Department)
                 .Include(s => s.Payments)
                 .Where(s => s.Year == selectedYear);
+
+            // Filter by member's department (for non-Admin/Owner users)
+            if (shouldFilterByDepartment)
+            {
+                query = query.Where(s => s.Member.DepartmentId.HasValue &&
+                    allowedDepartmentIds.Contains(s.Member.DepartmentId.Value));
+            }
 
             if (selectedMonth.HasValue)
                 query = query.Where(s => s.Month == selectedMonth.Value);

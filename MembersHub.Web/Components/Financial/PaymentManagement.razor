@@ -177,10 +177,27 @@
     private PaymentMethod quickPaymentMethod = PaymentMethod.Cash;
     private List<Subscription> memberPendingSubscriptions = new();
     private User? currentUser;
+    private List<int> allowedDepartmentIds = new();
+    private bool shouldFilterByDepartment = false;
 
     protected override async Task OnInitializedAsync()
     {
         currentUser = await SessionService.GetCurrentUserAsync();
+
+        // Check user role - only Admin/Owner see all members
+        bool isAdminOrOwner = currentUser != null &&
+            (currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner);
+        shouldFilterByDepartment = currentUser != null && !isAdminOrOwner;
+
+        if (shouldFilterByDepartment)
+        {
+            using var context = ContextFactory.CreateDbContext();
+            allowedDepartmentIds = await context.UserDepartments
+                .Where(ud => ud.UserId == currentUser!.Id)
+                .Select(ud => ud.DepartmentId)
+                .ToListAsync();
+        }
+
         await LoadPayments();
         await LoadMembers();
 
@@ -239,15 +256,24 @@
         try
         {
             using var context = ContextFactory.CreateDbContext();
-            allMembers = await context.Members
-                .Where(m => m.Status == MemberStatus.Active)
+            var query = context.Members
+                .Where(m => m.Status == MemberStatus.Active);
+
+            // Filter by department (for non-Admin/Owner users)
+            if (shouldFilterByDepartment)
+            {
+                query = query.Where(m => m.DepartmentId.HasValue &&
+                    allowedDepartmentIds.Contains(m.DepartmentId.Value));
+            }
+
+            allMembers = await query
                 .OrderBy(m => m.LastName)
                 .ThenBy(m => m.FirstName)
                 .ToListAsync();
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Σφάλμα κατά τη φόρτωση μελών: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Σφάλμα κατά τη φόρτωση αθλητών/μελών: {ex.Message}", Severity.Error);
         }
     }
 

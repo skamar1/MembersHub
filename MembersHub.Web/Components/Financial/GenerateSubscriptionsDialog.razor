@@ -109,7 +109,7 @@
                         else if (membersToCharge > 0)
                         {
                             <MudAlert Severity="Severity.Info">
-                                Φορτώνονται τα στοιχεία των μελών...
+                                Φορτώνονται τα στοιχεία των αθλητών/μελών...
                             </MudAlert>
                         }
                     </MudItem>
@@ -210,7 +210,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Σφάλμα φόρτωσης μελών: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Σφάλμα φόρτωσης αθλητών/μελών: {ex.Message}", Severity.Error);
         }
     }
 

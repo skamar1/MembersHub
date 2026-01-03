@@ -10,6 +10,7 @@ using MembersHub.Core.Interfaces;
 using System.Globalization;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -81,6 +82,12 @@ builder.Services.AddScoped<IHttpContextInfoService, HttpContextInfoService>();
 
 
 var app = builder.Build();
+
+// Configure forwarded headers for reverse proxy (Fly.io, nginx, etc.)
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 // Apply database migrations and seed data on startup
 using (var scope = app.Services.CreateScope())

@@ -12,6 +12,10 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JSRuntime
+@inject ISessionService SessionService
+@inject IDbContextFactory<MembersHubContext> ContextFactory
+@using MembersHub.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
 @attribute [Authorize]
 
 <PageTitle>Νέα Είσπραξη</PageTitle>
@@ -498,6 +502,8 @@
     private List<Payment> recentPayments = new();
     private decimal memberBalance = 0;
     private int? selectedSubscriptionId;
+    private List<int> allowedDepartmentIds = new();
+    private bool shouldFilterByDepartment = false;
 
     private class PaymentDistributionItem
     {
@@ -513,6 +519,21 @@
             PaymentMethod = PaymentMethod.Cash,
             Status = PaymentStatus.Confirmed
         };
+
+        // Check user role - only Admin/Owner see all members
+        var currentUser = await SessionService.GetCurrentUserAsync();
+        bool isAdminOrOwner = currentUser != null &&
+            (currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Owner);
+        shouldFilterByDepartment = currentUser != null && !isAdminOrOwner;
+
+        if (shouldFilterByDepartment)
+        {
+            using var context = ContextFactory.CreateDbContext();
+            allowedDepartmentIds = await context.UserDepartments
+                .Where(ud => ud.UserId == currentUser!.Id)
+                .Select(ud => ud.DepartmentId)
+                .ToListAsync();
+        }
 
         await LoadRecentPayments();
 
@@ -567,8 +588,24 @@
 
         try
         {
-            var members = await MemberService.SearchAsync(value);
-            return members.Take(10);
+            // Use direct DbContext for department filtering
+            using var context = ContextFactory.CreateDbContext();
+            var query = context.Members
+                .Include(m => m.MembershipType)
+                .Where(m => m.Status == MemberStatus.Active)
+                .Where(m =>
+                    m.FirstName.ToLower().Contains(value.ToLower()) ||
+                    m.LastName.ToLower().Contains(value.ToLower()) ||
+                    m.MemberNumber.ToLower().Contains(value.ToLower()));
+
+            // Filter by department (for non-Admin/Owner users)
+            if (shouldFilterByDepartment)
+            {
+                query = query.Where(m => m.DepartmentId.HasValue &&
+                    allowedDepartmentIds.Contains(m.DepartmentId.Value));
+            }
+
+            return await query.Take(10).ToListAsync();
         }
         catch
         {

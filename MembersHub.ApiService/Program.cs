@@ -8,6 +8,7 @@ using MembersHub.Infrastructure.Data;
 using MembersHub.Infrastructure;
 using MembersHub.Application;
 using MembersHub.ApiService.Middleware;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -101,6 +102,12 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Configure forwarded headers for reverse proxy (Fly.io, nginx, etc.)
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())

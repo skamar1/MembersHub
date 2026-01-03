@@ -11,7 +11,7 @@
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
     <MudText Typo="Typo.h4" Color="Color.Primary" Class="mb-4">
-        👥 Διαχείριση Μελών
+        👥 Διαχείριση Αθλητών / Μελών
     </MudText>
 
     <MudPaper Class="pa-4" Elevation="2">
@@ -37,7 +37,7 @@
         else
         {
             <MudText Typo="Typo.h6" Class="mb-3">
-                Σύνολο μελών: @members.Count | Ενεργά: @members.Count(m => m.Status == MemberStatus.Active)
+                Σύνολο αθλητών/μελών: @members.Count | Ενεργά: @members.Count(m => m.Status == MemberStatus.Active)
             </MudText>
             
             <MudTable Items="@members" Hover="true" Striped="true" Dense="true" Class="thick-borders">

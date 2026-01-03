@@ -16,11 +16,11 @@
 @inject NavigationManager Navigation
 @attribute [Authorize]
 
-<PageTitle>Διαχείριση Μελών - MembersHub</PageTitle>
+<PageTitle>Διαχείριση Αθλητών / Μελών - MembersHub</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
     <MudText Typo="Typo.h4" Color="Color.Primary">
-        👥 Διαχείριση Μελών
+        👥 Διαχείριση Αθλητών / Μελών
     </MudText>
 
     <MudPaper Class="pa-4 mt-4" Elevation="2">
@@ -29,7 +29,7 @@
             <div class="d-flex flex-wrap gap-2 justify-center">
                 <MudBadge Content="@totalMembers" Color="Color.Primary" Overlap="true">
                     <MudButton Variant="Variant.Outlined" StartIcon="Icons.Material.Filled.Group">
-                        Σύνολο Μελών
+                        Σύνολο Αθλητών / Μελών
                     </MudButton>
                 </MudBadge>
                 <MudBadge Content="@activeMembers" Color="Color.Success" Overlap="true">
@@ -54,7 +54,7 @@
         <!-- Search και Filters -->
         <div class="d-flex flex-column flex-md-row gap-3 mb-4">
             <MudTextField @bind-Value="searchString"
-                          Label="Αναζήτηση μελών..."
+                          Label="Αναζήτηση αθλητών/μελών..."
                           Variant="Variant.Outlined"
                           Adornment="Adornment.Start"
                           AdornmentIcon="Icons.Material.Filled.Search"

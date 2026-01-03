@@ -150,8 +150,8 @@
     private AuditAction? selectedAction;
     private string entityTypeFilter = "";
     private string usernameFilter = "";
-    private DateTime? fromDate = DateTime.Today.AddDays(-7);
-    private DateTime? toDate = DateTime.Today.AddDays(1);
+    private DateTime? fromDate = DateTime.UtcNow.Date.AddDays(-7);
+    private DateTime? toDate = DateTime.UtcNow.Date.AddDays(1);
     
     // Pagination
     private int currentPage = 1;
@@ -237,8 +237,8 @@
         selectedAction = null;
         entityTypeFilter = "";
         usernameFilter = "";
-        fromDate = DateTime.Today.AddDays(-7);
-        toDate = DateTime.Today.AddDays(1);
+        fromDate = DateTime.UtcNow.Date.AddDays(-7);
+        toDate = DateTime.UtcNow.Date.AddDays(1);
         currentPage = 1;
         await LoadAuditLogs();
     }
