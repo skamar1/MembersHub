@@ -182,7 +182,7 @@
 
         try
         {
-            var result = await AuthService.AuthenticateAsync(loginModel.Username, loginModel.Password);
+            var result = await AuthService.AuthenticateAsync(loginModel.Username, loginModel.Password, ipAddress ?? "Unknown", userAgent);
 
             if (result.IsSuccess && result.User != null)
             {
