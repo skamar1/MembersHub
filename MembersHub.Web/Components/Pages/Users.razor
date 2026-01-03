@@ -324,13 +324,6 @@
                     userLockoutStatus[user.Id] = false;
                 }
             }
-
-            // TEMPORARY: For demo purposes, mark the first user as locked to show unlock functionality
-            if (users.Any())
-            {
-                userLockoutStatus[users.First().Id] = true;
-                Console.WriteLine($"Demo: Marked user {users.First().Username} as locked for testing");
-            }
         }
         catch (Exception ex)
         {
