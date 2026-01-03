@@ -354,8 +354,8 @@
         {
             if (currentUser == null) return;
 
-            // Collectors see only their own expenses, Admins/Treasurers see all
-            if (CanApprove())
+            // Only Admins and Owners see all expenses, everyone else sees only their own
+            if (IsAdminOrOwner())
             {
                 expenses = await ExpenseService.GetExpensesByStatusAsync(ExpenseStatus.Pending);
                 var approved = await ExpenseService.GetExpensesByStatusAsync(ExpenseStatus.Approved);
@@ -485,11 +485,17 @@
         }
     }
 
-    private bool CanApprove()
+    private bool IsAdminOrOwner()
     {
         return currentUser?.Role == UserRole.Admin ||
-               currentUser?.Role == UserRole.Owner ||
-               currentUser?.Role == UserRole.Treasurer;
+               currentUser?.Role == UserRole.Owner;
+    }
+
+    private bool CanApprove()
+    {
+        // Only Admin and Owner can approve expenses (not Treasurer to avoid conflict of interest)
+        return currentUser?.Role == UserRole.Admin ||
+               currentUser?.Role == UserRole.Owner;
     }
 
     private bool CanEdit(Expense expense)

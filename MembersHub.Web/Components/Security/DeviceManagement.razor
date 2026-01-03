@@ -103,7 +103,7 @@
                         <TemplateColumn Title="Last Used">
                             <CellTemplate>
                                 <div>
-                                    <MudText Typo="Typo.body2">@context.Item.LastSeenAt.ToString("MMM dd, yyyy")</MudText>
+                                    <MudText Typo="Typo.body2">@context.Item.LastSeenAt.ToString("dd/MM/yyyy")</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Item.LastSeenAt.ToString("HH:mm:ss")</MudText>
                                 </div>
                             </CellTemplate>

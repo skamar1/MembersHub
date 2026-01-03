@@ -92,7 +92,7 @@
             <MudDataGrid T="SecurityEvent" Items="@recentSecurityEvents" Filterable="true" Sortable="true" 
                          Dense="true" Hover="true" Loading="@loading">
                 <Columns>
-                    <PropertyColumn Property="x => x.CreatedAt" Title="Time" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.CreatedAt" Title="Time" Format="dd/MM/yyyy HH:mm:ss" />
                     <PropertyColumn Property="x => x.User.Username" Title="User" />
                     <PropertyColumn Property="x => x.EventType" Title="Event" />
                     <PropertyColumn Property="x => x.IpAddress" Title="IP Address" />
@@ -139,7 +139,7 @@
                 <Columns>
                     <PropertyColumn Property="x => x.User.Username" Title="User" />
                     <PropertyColumn Property="x => x.FailedAttempts" Title="Failed Attempts" />
-                    <PropertyColumn Property="x => x.LastAttemptAt" Title="Last Attempt" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.LastAttemptAt" Title="Last Attempt" Format="dd/MM/yyyy HH:mm:ss" />
                     <PropertyColumn Property="x => x.LastAttemptIpAddress" Title="IP Address" />
                     <TemplateColumn Title="Status">
                         <CellTemplate>

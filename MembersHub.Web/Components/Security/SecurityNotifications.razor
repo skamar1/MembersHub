@@ -147,7 +147,7 @@
                             <!-- Metadata -->
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    @notification.CreatedAt.ToString("MMM dd, yyyy HH:mm:ss")
+                                    @notification.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")
                                     @if (!string.IsNullOrEmpty(notification.Location))
                                     {
                                         <text> • @notification.Location</text>

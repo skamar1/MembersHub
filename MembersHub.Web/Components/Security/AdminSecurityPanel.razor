@@ -76,7 +76,7 @@
             <MudDataGrid T="AuditLog" Items="@suspiciousActivities" Filterable="true" Sortable="true" 
                          Dense="true" Hover="true" Loading="@loading" Height="400px">
                 <Columns>
-                    <PropertyColumn Property="x => x.Timestamp" Title="Time" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.Timestamp" Title="Time" Format="dd/MM/yyyy HH:mm:ss" />
                     <PropertyColumn Property="x => x.Username" Title="User" />
                     <PropertyColumn Property="x => x.Action" Title="Action" />
                     <PropertyColumn Property="x => x.IpAddress" Title="IP Address" />
@@ -102,8 +102,12 @@
             <MudDataGrid T="SecurityNotification" Items="@criticalNotifications" Filterable="true" Sortable="true" 
                          Dense="true" Hover="true" Loading="@loading" Height="400px">
                 <Columns>
-                    <PropertyColumn Property="x => x.CreatedAt" Title="Time" Format="yyyy-MM-dd HH:mm:ss" />
-                    <PropertyColumn Property="x => x.User.Username" Title="User" />
+                    <PropertyColumn Property="x => x.CreatedAt" Title="Time" Format="dd/MM/yyyy HH:mm:ss" />
+                    <TemplateColumn Title="User">
+                        <CellTemplate>
+                            @(context.Item.User?.Username ?? "Unknown")
+                        </CellTemplate>
+                    </TemplateColumn>
                     <PropertyColumn Property="x => x.Title" Title="Title" />
                     <PropertyColumn Property="x => x.Severity" Title="Severity" />
                     <PropertyColumn Property="x => x.Location" Title="Location" />
@@ -128,11 +132,15 @@
             <MudDataGrid T="AccountLockout" Items="@recentLockouts" Filterable="true" Sortable="true" 
                          Dense="true" Hover="true" Loading="@loading" Height="400px">
                 <Columns>
-                    <PropertyColumn Property="x => x.User.Username" Title="User" />
+                    <TemplateColumn Title="User">
+                        <CellTemplate>
+                            @(context.Item.User?.Username ?? "Unknown")
+                        </CellTemplate>
+                    </TemplateColumn>
                     <PropertyColumn Property="x => x.FailedAttempts" Title="Failed Attempts" />
-                    <PropertyColumn Property="x => x.LastAttemptAt" Title="Last Attempt" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.LastAttemptAt" Title="Last Attempt" Format="dd/MM/yyyy HH:mm:ss" />
                     <PropertyColumn Property="x => x.LastAttemptIpAddress" Title="IP Address" />
-                    <PropertyColumn Property="x => x.LockedUntil" Title="Locked Until" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.LockedUntil" Title="Locked Until" Format="dd/MM/yyyy HH:mm:ss" />
                     <TemplateColumn Title="Status">
                         <CellTemplate>
                             @if (context.Item.IsLockedOut)
@@ -198,7 +206,7 @@
             <MudDataGrid T="AuditLog" Items="@searchResults" Filterable="false" Sortable="true" 
                          Dense="true" Hover="true" Loading="@searchLoading" Height="400px">
                 <Columns>
-                    <PropertyColumn Property="x => x.Timestamp" Title="Time" Format="yyyy-MM-dd HH:mm:ss" />
+                    <PropertyColumn Property="x => x.Timestamp" Title="Time" Format="dd/MM/yyyy HH:mm:ss" />
                     <PropertyColumn Property="x => x.Username" Title="User" />
                     <PropertyColumn Property="x => x.Action" Title="Action" />
                     <PropertyColumn Property="x => x.EntityType" Title="Entity" />
