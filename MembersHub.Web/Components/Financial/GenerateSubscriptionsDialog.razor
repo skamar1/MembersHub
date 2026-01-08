@@ -201,7 +201,7 @@
             using var context = ContextFactory.CreateDbContext();
             activeMembers = await context.Members
                 .Include(m => m.MembershipType)
-                .Where(m => m.Status == MemberStatus.Active)
+                .Where(m => m.Status == MemberStatus.Active && m.MembershipType.IsActive)
                 .OrderBy(m => m.MemberNumber)
                 .ToListAsync();
 

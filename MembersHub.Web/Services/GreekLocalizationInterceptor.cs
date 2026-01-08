@@ -34,12 +34,16 @@ public class GreekLocalizationInterceptor : ILocalizationInterceptor
         { "MudDataGrid_Group", "Ομαδοποίηση" },
         { "MudDataGrid_Ungroup", "Αφαίρεση ομαδοποίησης" },
 
-        // Pagination
+        // Pagination - MudTable
         { "MudTablePager_RowsPerPage", "Γραμμές ανά σελίδα:" },
         { "MudTablePager_FirstPageTooltip", "Πρώτη σελίδα" },
         { "MudTablePager_PreviousPageTooltip", "Προηγούμενη σελίδα" },
         { "MudTablePager_NextPageTooltip", "Επόμενη σελίδα" },
         { "MudTablePager_LastPageTooltip", "Τελευταία σελίδα" },
+
+        // Pagination - MudDataGrid
+        { "MudDataGridPager_RowsPerPage", "Γραμμές ανά σελίδα:" },
+        { "MudDataGridPager_InfoFormat", "{first_item}-{last_item} από {all_items}" },
 
         // Dialog
         { "MudDialog_Ok", "OK" },
