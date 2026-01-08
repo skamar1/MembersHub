@@ -174,24 +174,27 @@ public class SubscriptionService : ISubscriptionService
         {
             _logger.LogInformation("Generating monthly subscriptions for {Month}/{Year}", month, year);
 
-            // Check if subscriptions already exist for this period
-            var existingCount = await _context.Subscriptions
-                .CountAsync(s => s.Year == year && s.Month == month);
+            // Get IDs of members who already have subscriptions for this period
+            var membersWithSubscriptions = await _context.Subscriptions
+                .Where(s => s.Year == year && s.Month == month)
+                .Select(s => s.MemberId)
+                .ToListAsync();
 
-            if (existingCount > 0)
-            {
-                _logger.LogWarning("Subscriptions already exist for {Month}/{Year} (count: {Count})", month, year, existingCount);
-                throw new InvalidOperationException($"Subscriptions already exist for {month}/{year}");
-            }
-
-            // Get all active members with their membership types
+            // Get all active members with their membership types who DON'T have subscriptions yet
             var activeMembers = await _context.Members
                 .Include(m => m.MembershipType)
-                .Where(m => m.Status == MemberStatus.Active && m.MembershipType.IsActive)
+                .Where(m => m.Status == MemberStatus.Active &&
+                            m.MembershipType.IsActive &&
+                            !membersWithSubscriptions.Contains(m.Id))
                 .ToListAsync();
 
             if (!activeMembers.Any())
             {
+                if (membersWithSubscriptions.Any())
+                {
+                    _logger.LogWarning("All active members already have subscriptions for {Month}/{Year}", month, year);
+                    throw new InvalidOperationException($"Subscriptions already exist for {month}/{year}");
+                }
                 _logger.LogWarning("No active members found for subscription generation");
                 return 0;
             }

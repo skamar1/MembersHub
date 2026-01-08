@@ -38,11 +38,15 @@
                                   ReadOnly="@IsEdit" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="model.Phone" 
-                                  Label="Τηλέφωνο" 
-                                  Required="true" 
+                    <MudTextField @bind-Value="model.Phone"
+                                  Label="Τηλέφωνο"
+                                  Required="true"
                                   RequiredError="Το τηλέφωνο είναι υποχρεωτικό"
-                                  Mask="@(new PatternMask("0000000000"))"
+                                  InputType="InputType.Telephone"
+                                  OnBlur="ValidatePhone"
+                                  Error="@phoneError"
+                                  ErrorText="Το τηλέφωνο πρέπει να έχει 10 ψηφία"
+                                  HelperText="π.χ. 6912345678"
                                   Variant="Variant.Outlined" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
@@ -173,6 +177,7 @@
     private bool success;
     private string[] errors = { };
     private bool processing = false;
+    private bool phoneError = false;
 
     private UserModel model = new();
     private User? existingUser;
@@ -242,6 +247,12 @@
             model.IsActive = true;
             model.Role = UserRole.Viewer;
         }
+    }
+
+    private void ValidatePhone()
+    {
+        phoneError = !string.IsNullOrEmpty(model.Phone) &&
+                     !System.Text.RegularExpressions.Regex.IsMatch(model.Phone, @"^\d{10}$");
     }
 
     private void Cancel()

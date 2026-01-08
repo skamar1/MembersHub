@@ -146,7 +146,11 @@
                         <MudItem xs="12" sm="6">
                             <MudTextField @bind-Value="model.GuardianPhone"
                                           Label="Τηλέφωνο Κηδεμόνα"
-                                          Mask="@(new PatternMask("0000000000"))"
+                                          InputType="InputType.Telephone"
+                                          OnBlur="ValidateGuardianPhone"
+                                          Error="@guardianPhoneError"
+                                          ErrorText="Το τηλέφωνο πρέπει να έχει 10 ψηφία"
+                                          HelperText="π.χ. 6912345678"
                                           Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12" sm="6">
@@ -238,7 +242,8 @@
     private bool success;
     private string[] errors = { };
     private bool processing = false;
-    
+    private bool guardianPhoneError = false;
+
     private CreateMemberDto model = new();
     private UpdateMemberDto updateModel = new();
     private Member? existingMember;
@@ -320,6 +325,12 @@
                 dateOfBirth = TimeZone.ConvertToGreekTime(existingMember.DateOfBirth.Value).Date;
             }
         }
+    }
+
+    private void ValidateGuardianPhone()
+    {
+        guardianPhoneError = !string.IsNullOrEmpty(model.GuardianPhone) &&
+                             !System.Text.RegularExpressions.Regex.IsMatch(model.GuardianPhone, @"^\d{10}$");
     }
 
     private void Cancel()
