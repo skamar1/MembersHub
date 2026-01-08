@@ -174,23 +174,21 @@ public class SubscriptionService : ISubscriptionService
         {
             _logger.LogInformation("Generating monthly subscriptions for {Month}/{Year}", month, year);
 
-            // Get IDs of members who already have subscriptions for this period
-            var membersWithSubscriptions = await _context.Subscriptions
-                .Where(s => s.Year == year && s.Month == month)
-                .Select(s => s.MemberId)
-                .ToListAsync();
-
-            // Get all active members with their membership types who DON'T have subscriptions yet
+            // Get all active members who DON'T have subscriptions for this period (using subquery for reliable SQL translation)
             var activeMembers = await _context.Members
                 .Include(m => m.MembershipType)
                 .Where(m => m.Status == MemberStatus.Active &&
                             m.MembershipType.IsActive &&
-                            !membersWithSubscriptions.Contains(m.Id))
+                            !_context.Subscriptions.Any(s => s.MemberId == m.Id && s.Year == year && s.Month == month))
                 .ToListAsync();
 
             if (!activeMembers.Any())
             {
-                if (membersWithSubscriptions.Any())
+                // Check if there are existing subscriptions (for the warning message)
+                var existingSubscriptionsExist = await _context.Subscriptions
+                    .AnyAsync(s => s.Year == year && s.Month == month);
+
+                if (existingSubscriptionsExist)
                 {
                     _logger.LogWarning("All active members already have subscriptions for {Month}/{Year}", month, year);
                     throw new InvalidOperationException($"Subscriptions already exist for {month}/{year}");
