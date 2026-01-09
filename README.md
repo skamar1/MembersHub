@@ -189,7 +189,6 @@ dotnet test MembersHub.Application.Tests
 ## 📚 Documentation
 
 - **[SPECIFICATIONS.md](./SPECIFICATIONS.md)** - Αναλυτικές προδιαγραφές & αρχιτεκτονική
-- **[Entity Relationships](./docs/ERD.md)** - Database schema (if exists)
 - **API Documentation** - Available at `/swagger` in development mode
 
 ## 🤝 Contributing
@@ -243,6 +242,7 @@ fly apps restart melas
 
 ---
 
-**Production URL:** https://membershub.gr
-**Development URL:** https://membershub-web.fly.dev
+**Production URL:** https://meta-club.gr
+**Development URL:** https://melas.fly.dev/
 **Fly.io Dashboard:** https://fly.io/dashboard
+
