@@ -174,21 +174,26 @@ public class SubscriptionService : ISubscriptionService
         {
             _logger.LogInformation("Generating monthly subscriptions for {Month}/{Year}", month, year);
 
-            // Get all active members who DON'T have subscriptions for this period (using subquery for reliable SQL translation)
-            var activeMembers = await _context.Members
+            // Step 1: Get all active members with active membership types
+            var allActiveMembers = await _context.Members
                 .Include(m => m.MembershipType)
-                .Where(m => m.Status == MemberStatus.Active &&
-                            m.MembershipType.IsActive &&
-                            !_context.Subscriptions.Any(s => s.MemberId == m.Id && s.Year == year && s.Month == month))
+                .Where(m => m.Status == MemberStatus.Active && m.MembershipType.IsActive)
                 .ToListAsync();
+
+            // Step 2: Get IDs of members who already have subscriptions for this period
+            var existingSubscriptionMemberIds = await _context.Subscriptions
+                .Where(s => s.Year == year && s.Month == month)
+                .Select(s => s.MemberId)
+                .ToListAsync();
+
+            // Step 3: Filter in-memory to get members WITHOUT subscriptions
+            var activeMembers = allActiveMembers
+                .Where(m => !existingSubscriptionMemberIds.Contains(m.Id))
+                .ToList();
 
             if (!activeMembers.Any())
             {
-                // Check if there are existing subscriptions (for the warning message)
-                var existingSubscriptionsExist = await _context.Subscriptions
-                    .AnyAsync(s => s.Year == year && s.Month == month);
-
-                if (existingSubscriptionsExist)
+                if (existingSubscriptionMemberIds.Any())
                 {
                     _logger.LogWarning("All active members already have subscriptions for {Month}/{Year}", month, year);
                     throw new InvalidOperationException($"Subscriptions already exist for {month}/{year}");
